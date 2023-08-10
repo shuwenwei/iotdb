@@ -19,6 +19,9 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.tool.reader;
 
+import org.apache.iotdb.db.storageengine.dataregion.compaction.tool.TsFileStatisticReader;
+
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,7 +34,8 @@ public class AsyncThreadExecutor {
     executor = Executors.newFixedThreadPool(threadCount);
   }
 
-  public Future<TaskSummary> submit(Callable<TaskSummary> task) {
+  public Future<List<TsFileStatisticReader.ChunkGroupStatistics>> submit(
+      Callable<List<TsFileStatisticReader.ChunkGroupStatistics>> task) {
     return executor.submit(task);
   }
 

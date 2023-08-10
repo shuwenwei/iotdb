@@ -23,9 +23,10 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.tool.reader.Async
 import org.apache.iotdb.db.storageengine.dataregion.compaction.tool.reader.SingleSequenceFileTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.tool.reader.TaskSummary;
 import org.apache.iotdb.tsfile.file.metadata.IChunkMetadata;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.tool.reader.ReadFileTask;
+import org.apache.iotdb.tsfile.file.metadata.ChunkMetadata;
 import org.apache.iotdb.tsfile.utils.Pair;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Future;
@@ -37,7 +38,7 @@ public class TimePartitionProcessTask {
   private long buildUnseqSpaceStatisticCost = 0;
   private long checkOverlapCost = 0;
 
-  private AsyncThreadExecutor executor;
+  private AsyncThreadExecutor executor = new AsyncThreadExecutor(10);
 
   public TimePartitionProcessTask(
       String timePartition, Pair<List<String>, List<String>> timePartitionFiles) {
@@ -48,7 +49,7 @@ public class TimePartitionProcessTask {
   public OverlapStatistic processTimePartition() {
     long startTime = System.currentTimeMillis();
     OverlapStatistic partialRet =
-        processOneTimePartitionAsync(timePartitionFiles.left, timePartitionFiles.right);
+        processOneTimePartition(timePartitionFiles.left, timePartitionFiles.right);
     // 更新并打印进度
     OverlapStatisticTool.outputInfolock.lock();
     OverlapStatisticTool.processedTimePartitionCount += 1;
@@ -63,22 +64,24 @@ public class TimePartitionProcessTask {
         ((double) readFileCost / 1000),
         ((double) buildUnseqSpaceStatisticCost / 1000),
         ((double) checkOverlapCost / 1000));
-
+    executor.shutdown();
     return partialRet;
   }
 
   private UnseqSpaceStatistics buildUnseqSpaceStatistics(List<String> unseqFiles) {
     UnseqSpaceStatistics unseqSpaceStatistics = new UnseqSpaceStatistics();
 
+    List<Future<List<TsFileStatisticReader.ChunkGroupStatistics>>> futures = new ArrayList<>();
+    long startTime = System.currentTimeMillis();
     for (String unseqFile : unseqFiles) {
-      long startTime = System.currentTimeMillis();
-      try (TsFileStatisticReader reader = new TsFileStatisticReader(unseqFile)) {
-        List<TsFileStatisticReader.ChunkGroupStatistics> chunkGroupStatisticsList =
-            reader.getChunkGroupStatistics();
-        readFileCost += (System.currentTimeMillis() - startTime);
+      futures.add(executor.submit(new ReadFileTask(unseqFile)));
+    }
+    for (Future<List<TsFileStatisticReader.ChunkGroupStatistics>> future : futures) {
+      try {
+        List<TsFileStatisticReader.ChunkGroupStatistics> chunkGroupStatistics = future.get();
 
         startTime = System.currentTimeMillis();
-        for (TsFileStatisticReader.ChunkGroupStatistics statistics : chunkGroupStatisticsList) {
+        for (TsFileStatisticReader.ChunkGroupStatistics statistics : chunkGroupStatistics) {
           long deviceStartTime = Long.MAX_VALUE, deviceEndTime = Long.MIN_VALUE;
           for (IChunkMetadata chunkMetadata : statistics.getChunkMetadataList()) {
             deviceStartTime = Math.min(deviceStartTime, chunkMetadata.getStartTime());
@@ -92,31 +95,36 @@ public class TimePartitionProcessTask {
               statistics.getDeviceID(), new Interval(deviceStartTime, deviceEndTime));
         }
         buildUnseqSpaceStatisticCost += (System.currentTimeMillis() - startTime);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
+
+      } catch (Exception e) {
+        // todo
       }
     }
+    readFileCost += (System.currentTimeMillis() - startTime);
     return unseqSpaceStatistics;
   }
 
   public OverlapStatistic processOneTimePartition(List<String> seqFiles, List<String> unseqFiles) {
+
     // 1. 根据 timePartition，获取所有数据目录下的的乱序文件，构造 UnseqSpaceStatistics
     UnseqSpaceStatistics unseqSpaceStatistics = buildUnseqSpaceStatistics(unseqFiles);
+    long startTime = System.currentTimeMillis();
 
     // 2. 遍历该时间分区下的所有顺序文件，获取每一个 chunk 的信息，依次进行 overlap 检查，并更新统计信息
     OverlapStatistic overlapStatistic = new OverlapStatistic();
     overlapStatistic.totalFiles += seqFiles.size();
+
+    List<Future<List<TsFileStatisticReader.ChunkGroupStatistics>>> futures = new ArrayList<>();
     for (String seqFile : seqFiles) {
-      boolean isFileOverlap = false;
-      long startTime = System.currentTimeMillis();
-      try (TsFileStatisticReader reader = new TsFileStatisticReader(seqFile)) {
-        // 统计顺序文件的信息并更新到 overlapStatistic
-        List<TsFileStatisticReader.ChunkGroupStatistics> chunkGroupStatisticsList =
-            reader.getChunkGroupStatistics();
-        readFileCost += (System.currentTimeMillis() - startTime);
-        startTime = System.currentTimeMillis();
+      futures.add(executor.submit(new ReadFileTask(seqFile)));
+    }
+
+    for (Future<List<TsFileStatisticReader.ChunkGroupStatistics>> future : futures) {
+      try {
+        boolean isFileOverlap = false;
+        List<TsFileStatisticReader.ChunkGroupStatistics> chunkGroupStatisticList = future.get();
         for (TsFileStatisticReader.ChunkGroupStatistics chunkGroupStatistics :
-            chunkGroupStatisticsList) {
+            chunkGroupStatisticList) {
           overlapStatistic.totalChunks += chunkGroupStatistics.getTotalChunkNum();
           String deviceId = chunkGroupStatistics.getDeviceID();
           int overlapChunkNum = 0;
@@ -151,43 +159,99 @@ public class TimePartitionProcessTask {
           overlapStatistic.overlappedChunks += overlapChunkNum;
           isFileOverlap = true;
         }
-        overlapStatistic.totalChunkGroups += chunkGroupStatisticsList.size();
+        if (isFileOverlap) {
+          overlapStatistic.overlappedFiles += 1;
+        }
+        overlapStatistic.totalChunkGroups += chunkGroupStatisticList.size();
         checkOverlapCost += (System.currentTimeMillis() - startTime);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-      if (isFileOverlap) {
-        overlapStatistic.overlappedFiles += 1;
+        readFileCost += (System.currentTimeMillis() - startTime);
+
+      } catch (Exception e) {
       }
     }
+
+    //    for (String seqFile : seqFiles) {
+    //      boolean isFileOverlap = false;
+    //      long startTime = System.currentTimeMillis();
+    //      try (TsFileStatisticReader reader = new TsFileStatisticReader(seqFile)) {
+    //        // 统计顺序文件的信息并更新到 overlapStatistic
+    //        List<TsFileStatisticReader.ChunkGroupStatistics> chunkGroupStatisticsList =
+    //            reader.getChunkGroupStatistics();
+    //        readFileCost += (System.currentTimeMillis() - startTime);
+    //        startTime = System.currentTimeMillis();
+    //        for (TsFileStatisticReader.ChunkGroupStatistics chunkGroupStatistics :
+    //            chunkGroupStatisticsList) {
+    //          overlapStatistic.totalChunks += chunkGroupStatistics.getTotalChunkNum();
+    //          String deviceId = chunkGroupStatistics.getDeviceID();
+    //          int overlapChunkNum = 0;
+    //
+    //          long deviceStartTime = Long.MAX_VALUE, deviceEndTime = Long.MIN_VALUE;
+    //
+    //          for (ChunkMetadata chunkMetadata : chunkGroupStatistics.getChunkMetadataList()) {
+    //            // skip empty chunk
+    //            if (chunkMetadata.getStartTime() > chunkMetadata.getEndTime()) {
+    //              continue;
+    //            }
+    //            // update device start time and end time
+    //            deviceStartTime = Math.min(deviceStartTime, chunkMetadata.getStartTime());
+    //            deviceEndTime = Math.max(deviceEndTime, chunkMetadata.getEndTime());
+    //            // check chunk overlap
+    //            Interval interval =
+    //                new Interval(chunkMetadata.getStartTime(), chunkMetadata.getEndTime());
+    //            String measurementId = chunkMetadata.getMeasurementUid();
+    //            if (unseqSpaceStatistics.chunkHasOverlap(deviceId, measurementId, interval)) {
+    //              overlapChunkNum++;
+    //            }
+    //          }
+    //          // check device overlap
+    //          if (deviceStartTime > deviceEndTime) {
+    //            continue;
+    //          }
+    //          Interval deviceInterval = new Interval(deviceStartTime, deviceEndTime);
+    //          if (!unseqSpaceStatistics.chunkGroupHasOverlap(deviceId, deviceInterval)) {
+    //            continue;
+    //          }
+    //          overlapStatistic.overlappedChunkGroups++;
+    //          overlapStatistic.overlappedChunks += overlapChunkNum;
+    //          isFileOverlap = true;
+    //        }
+    //        overlapStatistic.totalChunkGroups += chunkGroupStatisticsList.size();
+    //        checkOverlapCost += (System.currentTimeMillis() - startTime);
+    //      } catch (IOException e) {
+    //        throw new RuntimeException(e);
+    //      }
+    //      if (isFileOverlap) {
+    //        overlapStatistic.overlappedFiles += 1;
+    //      }
+    //    }
     return overlapStatistic;
   }
 
-  public OverlapStatistic processOneTimePartitionAsync(
-      List<String> seqFiles, List<String> unseqFiles) {
-    UnseqSpaceStatistics unseqSpaceStatistics = buildUnseqSpaceStatistics(unseqFiles);
-    OverlapStatistic overlapStatistic = new OverlapStatistic();
-    overlapStatistic.totalFiles += seqFiles.size();
-    executor = new AsyncThreadExecutor(10);
-    List<Future<TaskSummary>> futures = new ArrayList<>();
-    for (String seqFile : seqFiles) {
-      futures.add(executor.submit(new SingleSequenceFileTask(unseqSpaceStatistics, seqFile)));
-    }
-    for (Future<TaskSummary> future : futures) {
-      try {
-        TaskSummary taskSummary = future.get();
-        overlapStatistic.overlappedChunkGroups += taskSummary.overlapChunkGroup;
-        overlapStatistic.totalChunkGroups += taskSummary.totalChunkGroups;
-        overlapStatistic.overlappedChunks += taskSummary.overlapChunk;
-        overlapStatistic.totalChunks += taskSummary.totalChunks;
-        if (taskSummary.overlapChunkGroup > 0) {
-          overlapStatistic.overlappedFiles++;
-        }
-      } catch (Exception e) {
-        // todo
-      }
-    }
-    executor.shutdown();
-    return overlapStatistic;
-  }
+  //  public OverlapStatistic processOneTimePartitionAsync(
+  //      List<String> seqFiles, List<String> unseqFiles) {
+  //    UnseqSpaceStatistics unseqSpaceStatistics = buildUnseqSpaceStatistics(unseqFiles);
+  //    OverlapStatistic overlapStatistic = new OverlapStatistic();
+  //    overlapStatistic.totalFiles += seqFiles.size();
+  //    executor = new AsyncThreadExecutor(10);
+  //    List<Future<TaskSummary>> futures = new ArrayList<>();
+  //    for (String seqFile : seqFiles) {
+  //      futures.add(executor.submit(new SingleSequenceFileTask(unseqSpaceStatistics, seqFile)));
+  //    }
+  //    for (Future<TaskSummary> future : futures) {
+  //      try {
+  //        TaskSummary taskSummary = future.get();
+  //        overlapStatistic.overlappedChunkGroups += taskSummary.overlapChunkGroup;
+  //        overlapStatistic.totalChunkGroups += taskSummary.totalChunkGroups;
+  //        overlapStatistic.overlappedChunks += taskSummary.overlapChunk;
+  //        overlapStatistic.totalChunks += taskSummary.totalChunks;
+  //        if (taskSummary.overlapChunkGroup > 0) {
+  //          overlapStatistic.overlappedFiles++;
+  //        }
+  //      } catch (Exception e) {
+  //        // todo
+  //      }
+  //    }
+  //    executor.shutdown();
+  //    return overlapStatistic;
+  //  }
 }
