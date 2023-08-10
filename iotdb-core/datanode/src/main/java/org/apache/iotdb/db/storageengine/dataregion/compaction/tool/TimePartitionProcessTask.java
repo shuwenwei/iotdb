@@ -97,7 +97,7 @@ public class TimePartitionProcessTask {
         // todo
       }
     }
-    readFileCost += (System.currentTimeMillis() - startTime);
+    readFileCost += (System.currentTimeMillis() - startTime - buildUnseqSpaceStatisticCost);
     return unseqSpaceStatistics;
   }
 

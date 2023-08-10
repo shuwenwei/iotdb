@@ -50,6 +50,7 @@ public class TsFileStatisticReader implements Closeable {
       for (TimeseriesMetadata timeseriesMetadata : deviceMetadataList) {
         chunkGroupStatistics.chunkMetadataList.addAll(timeseriesMetadata.getChunkMetadataList());
       }
+      chunkGroupStatisticsList.add(chunkGroupStatistics);
     }
     return chunkGroupStatisticsList;
   }
