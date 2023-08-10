@@ -35,7 +35,7 @@ public class TimePartitionProcessTask {
   private long buildUnseqSpaceStatisticCost = 0;
   private long checkOverlapCost = 0;
 
-  private AsyncThreadExecutor executor = new AsyncThreadExecutor(10);
+  private AsyncThreadExecutor executor = new AsyncThreadExecutor(4);
 
   public TimePartitionProcessTask(
       String timePartition, Pair<List<String>, List<String>> timePartitionFiles) {
@@ -73,11 +73,12 @@ public class TimePartitionProcessTask {
     for (String unseqFile : unseqFiles) {
       futures.add(executor.submit(new ReadFileTask(unseqFile)));
     }
+
     for (Future<List<TsFileStatisticReader.ChunkGroupStatistics>> future : futures) {
       try {
         List<TsFileStatisticReader.ChunkGroupStatistics> chunkGroupStatistics = future.get();
 
-        startTime = System.currentTimeMillis();
+        long buildStatisticStartTime = System.currentTimeMillis();
         for (TsFileStatisticReader.ChunkGroupStatistics statistics : chunkGroupStatistics) {
           long deviceStartTime = Long.MAX_VALUE, deviceEndTime = Long.MIN_VALUE;
           for (IChunkMetadata chunkMetadata : statistics.getChunkMetadataList()) {
@@ -91,7 +92,7 @@ public class TimePartitionProcessTask {
           unseqSpaceStatistics.updateDevice(
               statistics.getDeviceID(), new Interval(deviceStartTime, deviceEndTime));
         }
-        buildUnseqSpaceStatisticCost += (System.currentTimeMillis() - startTime);
+        buildUnseqSpaceStatisticCost += (System.currentTimeMillis() - buildStatisticStartTime);
 
       } catch (Exception e) {
         // todo
@@ -105,7 +106,7 @@ public class TimePartitionProcessTask {
 
     // 1. 根据 timePartition，获取所有数据目录下的的乱序文件，构造 UnseqSpaceStatistics
     UnseqSpaceStatistics unseqSpaceStatistics = buildUnseqSpaceStatistics(unseqFiles);
-    long startTime = System.currentTimeMillis();
+    long taskStartTime = System.currentTimeMillis();
 
     // 2. 遍历该时间分区下的所有顺序文件，获取每一个 chunk 的信息，依次进行 overlap 检查，并更新统计信息
     OverlapStatistic overlapStatistic = new OverlapStatistic();
@@ -120,6 +121,7 @@ public class TimePartitionProcessTask {
       try {
         boolean isFileOverlap = false;
         List<TsFileStatisticReader.ChunkGroupStatistics> chunkGroupStatisticList = future.get();
+        long checkOverlapStartTime = System.currentTimeMillis();
         for (TsFileStatisticReader.ChunkGroupStatistics chunkGroupStatistics :
             chunkGroupStatisticList) {
           overlapStatistic.totalChunks += chunkGroupStatistics.getTotalChunkNum();
@@ -155,17 +157,17 @@ public class TimePartitionProcessTask {
           overlapStatistic.overlappedChunkGroups++;
           overlapStatistic.overlappedChunks += overlapChunkNum;
           isFileOverlap = true;
+          checkOverlapCost += (System.currentTimeMillis() - checkOverlapStartTime);
         }
         if (isFileOverlap) {
           overlapStatistic.overlappedFiles += 1;
         }
         overlapStatistic.totalChunkGroups += chunkGroupStatisticList.size();
-        checkOverlapCost += (System.currentTimeMillis() - startTime);
-        readFileCost += (System.currentTimeMillis() - startTime);
 
       } catch (Exception e) {
       }
     }
+    readFileCost += (System.currentTimeMillis() - taskStartTime - checkOverlapCost);
     return overlapStatistic;
   }
 }
