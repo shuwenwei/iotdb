@@ -19,17 +19,13 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.tool;
 
-import org.apache.iotdb.tsfile.file.metadata.ChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.IChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.TimeseriesMetadata;
-import org.apache.iotdb.tsfile.read.TsFileDeviceIterator;
 import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
-import org.apache.iotdb.tsfile.utils.Pair;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -37,14 +33,9 @@ public class TsFileStatisticReader implements Closeable {
 
   private final TsFileSequenceReader reader;
 
-  private final List<ChunkGroupStatistics> chunkGroupStatisticsList;
-
   public TsFileStatisticReader(String filePath) throws IOException {
     reader = new TsFileSequenceReader(filePath);
-    chunkGroupStatisticsList = new ArrayList<>();
   }
-
-
 
   public List<ChunkGroupStatistics> getChunkGroupStatistics() throws IOException {
     Map<String, List<TimeseriesMetadata>> allTimeseriesMetadata = reader.getAllTimeseriesMetadata(true);
