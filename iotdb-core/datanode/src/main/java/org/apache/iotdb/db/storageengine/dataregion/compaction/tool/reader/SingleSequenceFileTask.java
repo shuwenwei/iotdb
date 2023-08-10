@@ -23,6 +23,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.tool.Interval;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.tool.TsFileStatisticReader;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.tool.UnseqSpaceStatistics;
 import org.apache.iotdb.tsfile.file.metadata.ChunkMetadata;
+import org.apache.iotdb.tsfile.file.metadata.IChunkMetadata;
 
 import java.io.IOException;
 import java.util.List;
@@ -56,7 +57,7 @@ public class SingleSequenceFileTask implements Callable<TaskSummary> {
 
         long deviceStartTime = Long.MAX_VALUE, deviceEndTime = Long.MIN_VALUE;
 
-        for (ChunkMetadata chunkMetadata : chunkGroupStatistics.getChunkMetadataList()) {
+        for (IChunkMetadata chunkMetadata : chunkGroupStatistics.getChunkMetadataList()) {
           // skip empty chunk
           if (chunkMetadata.getStartTime() > chunkMetadata.getEndTime()) {
             continue;

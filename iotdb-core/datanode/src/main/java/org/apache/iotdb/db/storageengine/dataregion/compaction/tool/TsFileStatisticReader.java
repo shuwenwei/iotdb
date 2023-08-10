@@ -20,6 +20,8 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.tool;
 
 import org.apache.iotdb.tsfile.file.metadata.ChunkMetadata;
+import org.apache.iotdb.tsfile.file.metadata.IChunkMetadata;
+import org.apache.iotdb.tsfile.file.metadata.TimeseriesMetadata;
 import org.apache.iotdb.tsfile.read.TsFileDeviceIterator;
 import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
 import org.apache.iotdb.tsfile.utils.Pair;
@@ -42,29 +44,21 @@ public class TsFileStatisticReader implements Closeable {
     chunkGroupStatisticsList = new ArrayList<>();
   }
 
+
+
   public List<ChunkGroupStatistics> getChunkGroupStatistics() throws IOException {
-    TsFileDeviceIterator allDevicesIteratorWithIsAligned =
-        reader.getAllDevicesIteratorWithIsAligned();
-    while (allDevicesIteratorWithIsAligned.hasNext()) {
-      Pair<String, Boolean> deviceWithIsAligned = allDevicesIteratorWithIsAligned.next();
-      String deviceId = deviceWithIsAligned.left;
-      boolean isAligned = deviceWithIsAligned.right;
-
-      ChunkGroupStatistics chunkGroupStatistics = new ChunkGroupStatistics(deviceId, isAligned);
-      Iterator<Map<String, List<ChunkMetadata>>> measurementChunkMetadataListMapIterator =
-          reader.getMeasurementChunkMetadataListMapIterator(deviceId);
-
-      while (measurementChunkMetadataListMapIterator.hasNext()) {
-        Map<String, List<ChunkMetadata>> measurementChunkMetadataListMap =
-            measurementChunkMetadataListMapIterator.next();
-        for (Map.Entry<String, List<ChunkMetadata>> measurementChunkMetadataList :
-            measurementChunkMetadataListMap.entrySet()) {
-          List<ChunkMetadata> chunkMetadataList = measurementChunkMetadataList.getValue();
-          chunkGroupStatistics.chunkMetadataList.addAll(chunkMetadataList);
-          chunkGroupStatistics.totalChunkNum += chunkMetadataList.size();
-        }
+    Map<String, List<TimeseriesMetadata>> allTimeseriesMetadata = reader.getAllTimeseriesMetadata(true);
+    List<ChunkGroupStatistics> chunkGroupStatisticsList = new ArrayList<>();
+    for (Map.Entry<String, List<TimeseriesMetadata>> deviceTimeSeriesMetadataListEntry : allTimeseriesMetadata.entrySet()) {
+      String deviceId = deviceTimeSeriesMetadataListEntry.getKey();
+      List<TimeseriesMetadata> deviceMetadataList = deviceTimeSeriesMetadataListEntry.getValue();
+      if (deviceMetadataList.isEmpty()) {
+        continue;
       }
-      chunkGroupStatisticsList.add(chunkGroupStatistics);
+      ChunkGroupStatistics chunkGroupStatistics = new ChunkGroupStatistics(deviceId, deviceMetadataList.get(0).getMeasurementId().isEmpty());
+      for (TimeseriesMetadata timeseriesMetadata : deviceMetadataList) {
+        chunkGroupStatistics.chunkMetadataList.addAll(timeseriesMetadata.getChunkMetadataList());
+      }
     }
     return chunkGroupStatisticsList;
   }
@@ -76,9 +70,8 @@ public class TsFileStatisticReader implements Closeable {
 
   public static class ChunkGroupStatistics {
     private final String deviceID;
-    private final List<ChunkMetadata> chunkMetadataList;
+    private final List<IChunkMetadata> chunkMetadataList;
     private final boolean isAligned;
-    private int totalChunkNum = 0;
 
     private ChunkGroupStatistics(String deviceId, boolean isAligned) {
       this.deviceID = deviceId;
@@ -90,12 +83,12 @@ public class TsFileStatisticReader implements Closeable {
       return deviceID;
     }
 
-    public List<ChunkMetadata> getChunkMetadataList() {
+    public List<IChunkMetadata> getChunkMetadataList() {
       return chunkMetadataList;
     }
 
     public int getTotalChunkNum() {
-      return totalChunkNum;
+      return chunkMetadataList.size();
     }
 
     public boolean isAligned() {

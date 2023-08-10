@@ -22,7 +22,7 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.tool;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.tool.reader.AsyncThreadExecutor;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.tool.reader.SingleSequenceFileTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.tool.reader.TaskSummary;
-import org.apache.iotdb.tsfile.file.metadata.ChunkMetadata;
+import org.apache.iotdb.tsfile.file.metadata.IChunkMetadata;
 import org.apache.iotdb.tsfile.utils.Pair;
 
 import java.io.IOException;
@@ -80,7 +80,7 @@ public class TimePartitionProcessTask {
         startTime = System.currentTimeMillis();
         for (TsFileStatisticReader.ChunkGroupStatistics statistics : chunkGroupStatisticsList) {
           long deviceStartTime = Long.MAX_VALUE, deviceEndTime = Long.MIN_VALUE;
-          for (ChunkMetadata chunkMetadata : statistics.getChunkMetadataList()) {
+          for (IChunkMetadata chunkMetadata : statistics.getChunkMetadataList()) {
             deviceStartTime = Math.min(deviceStartTime, chunkMetadata.getStartTime());
             deviceEndTime = Math.max(deviceEndTime, chunkMetadata.getEndTime());
             unseqSpaceStatistics.updateMeasurement(
@@ -123,7 +123,7 @@ public class TimePartitionProcessTask {
 
           long deviceStartTime = Long.MAX_VALUE, deviceEndTime = Long.MIN_VALUE;
 
-          for (ChunkMetadata chunkMetadata : chunkGroupStatistics.getChunkMetadataList()) {
+          for (IChunkMetadata chunkMetadata : chunkGroupStatistics.getChunkMetadataList()) {
             // skip empty chunk
             if (chunkMetadata.getStartTime() > chunkMetadata.getEndTime()) {
               continue;
