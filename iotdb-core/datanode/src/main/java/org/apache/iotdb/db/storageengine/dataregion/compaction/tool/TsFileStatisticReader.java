@@ -30,16 +30,73 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 public class TsFileStatisticReader implements Closeable {
 
   private final TsFileSequenceReader reader;
 
   private final List<ChunkGroupStatistics> chunkGroupStatisticsList;
+  private String currentDevice;
+  private TsFileDeviceIterator deviceIterator;
+  private Iterator<Map<String, List<ChunkMetadata>>> deviceMeasurementsIterator;
+  private Iterator<Map.Entry<String, List<ChunkMetadata>>> chunkMetadataListIterator;
+  private List<ChunkMetadata> chunkMetadataList;
 
   public TsFileStatisticReader(String filePath) throws IOException {
     reader = new TsFileSequenceReader(filePath);
     chunkGroupStatisticsList = new ArrayList<>();
+    deviceIterator = reader.getAllDevicesIteratorWithIsAligned();
+    while (deviceIterator.hasNext()) {
+      currentDevice = deviceIterator.next().left;
+      deviceMeasurementsIterator = reader.getMeasurementChunkMetadataListMapIterator(currentDevice);
+      while (deviceMeasurementsIterator.hasNext()) {
+        chunkMetadataListIterator = deviceMeasurementsIterator.next().entrySet().iterator();
+        if (chunkMetadataListIterator.hasNext()) {
+          chunkMetadataList = chunkMetadataListIterator.next().getValue();
+          return;
+        }
+      }
+    }
+  }
+
+  public boolean hasNextSeries() {
+    return chunkMetadataList != null;
+  }
+
+  public List<ChunkMetadata> nextSeries() throws IOException {
+    if (chunkMetadataList == null) {
+      throw new NoSuchElementException();
+    }
+    List<ChunkMetadata> result = chunkMetadataList;
+    if (chunkMetadataListIterator.hasNext()) {
+      chunkMetadataList = chunkMetadataListIterator.next().getValue();
+      return result;
+    }
+    while (deviceMeasurementsIterator.hasNext()) {
+      chunkMetadataListIterator = deviceMeasurementsIterator.next().entrySet().iterator();
+      if (chunkMetadataListIterator.hasNext()) {
+        chunkMetadataList = chunkMetadataListIterator.next().getValue();
+        return result;
+      }
+    }
+    while (deviceIterator.hasNext()) {
+      currentDevice = deviceIterator.next().left;
+      deviceMeasurementsIterator = reader.getMeasurementChunkMetadataListMapIterator(currentDevice);
+      while (deviceMeasurementsIterator.hasNext()) {
+        chunkMetadataListIterator = deviceMeasurementsIterator.next().entrySet().iterator();
+        if (chunkMetadataListIterator.hasNext()) {
+          chunkMetadataList = chunkMetadataListIterator.next().getValue();
+          return result;
+        }
+      }
+    }
+    chunkMetadataList = null;
+    return result;
+  }
+
+  public String currentDevice() {
+    return currentDevice;
   }
 
   public List<ChunkGroupStatistics> getChunkGroupStatistics() throws IOException {
