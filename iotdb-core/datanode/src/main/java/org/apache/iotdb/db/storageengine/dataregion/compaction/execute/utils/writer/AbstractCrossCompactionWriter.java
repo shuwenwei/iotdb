@@ -65,7 +65,7 @@ public abstract class AbstractCrossCompactionWriter extends AbstractCompactionWr
   protected List<TsFileResource> targetResources;
 
   protected AbstractCrossCompactionWriter(
-      List<TsFileResource> targetResources, List<TsFileResource> seqFileResources)
+      List<TsFileResource> targetResources, List<TsFileResource> seqFileResources, boolean append)
       throws IOException {
     currentDeviceEndTime = new long[seqFileResources.size()];
     isEmptyFile = new boolean[seqFileResources.size()];
@@ -83,11 +83,18 @@ public abstract class AbstractCrossCompactionWriter extends AbstractCompactionWr
               targetResources.get(i).getTsFile(),
               enableMemoryControl,
               memorySizeForEachWriter,
-              CompactionType.CROSS_COMPACTION));
+              CompactionType.CROSS_COMPACTION,
+              append));
       isEmptyFile[i] = true;
     }
     this.seqTsFileResources = seqFileResources;
     this.targetResources = targetResources;
+  }
+
+  protected AbstractCrossCompactionWriter(
+      List<TsFileResource> targetResources, List<TsFileResource> seqFileResources)
+      throws IOException {
+    this(targetResources, seqFileResources, false);
   }
 
   @Override

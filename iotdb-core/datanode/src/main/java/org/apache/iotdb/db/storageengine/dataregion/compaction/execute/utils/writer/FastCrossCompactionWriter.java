@@ -45,7 +45,17 @@ public class FastCrossCompactionWriter extends AbstractCrossCompactionWriter {
       List<TsFileResource> seqSourceResources,
       Map<TsFileResource, TsFileSequenceReader> readerMap)
       throws IOException {
-    super(targetResources, seqSourceResources);
+    this(targetResources, seqSourceResources, readerMap, false);
+  }
+
+  // Used for device compaction
+  public FastCrossCompactionWriter(
+      List<TsFileResource> targetResources,
+      List<TsFileResource> seqResources,
+      Map<TsFileResource, TsFileSequenceReader> readerMap,
+      boolean append)
+      throws IOException {
+    super(seqResources, seqResources, append);
     this.readerMap = readerMap;
   }
 

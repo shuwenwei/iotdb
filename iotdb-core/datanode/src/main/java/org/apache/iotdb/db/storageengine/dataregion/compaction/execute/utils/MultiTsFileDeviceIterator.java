@@ -140,6 +140,9 @@ public class MultiTsFileDeviceIterator implements AutoCloseable {
     }
 
     for (TsFileResource tsFileResource : tsFileResourcesSortedByDesc) {
+      if (readerMap.containsKey(tsFileResource)) {
+        continue;
+      }
       TsFileSequenceReader reader =
           new CompactionTsFileReader(tsFileResource.getTsFilePath(), type);
       readerMap.put(tsFileResource, reader);

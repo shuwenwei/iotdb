@@ -127,7 +127,19 @@ public class TsFileIOWriter implements AutoCloseable {
    * @throws IOException if I/O error occurs
    */
   public TsFileIOWriter(File file) throws IOException {
-    this.out = FSFactoryProducer.getFileOutputFactory().getTsFileOutput(file.getPath(), false);
+    this(file, false);
+  }
+
+
+  /**
+   * for writing a new tsfile.
+   *
+   * @param file be used to output written data
+   * @param append be used to set output mode
+   * @throws IOException if I/O error occurs
+   */
+  public TsFileIOWriter(File file, boolean append) throws IOException {
+    this.out = FSFactoryProducer.getFileOutputFactory().getTsFileOutput(file.getPath(), append);
     this.file = file;
     if (resourceLogger.isDebugEnabled()) {
       resourceLogger.debug("{} writer is opened.", file.getName());
@@ -153,7 +165,13 @@ public class TsFileIOWriter implements AutoCloseable {
   /** for write with memory control */
   public TsFileIOWriter(File file, boolean enableMemoryControl, long maxMetadataSize)
       throws IOException {
-    this(file);
+    this(file, enableMemoryControl, maxMetadataSize, false);
+  }
+
+  /** for write with memory control */
+  public TsFileIOWriter(File file, boolean enableMemoryControl, long maxMetadataSize, boolean append)
+      throws IOException {
+    this(file, append);
     this.enableMemoryControl = enableMemoryControl;
     this.maxMetadataSize = maxMetadataSize;
     chunkMetadataTempFile = new File(file.getAbsolutePath() + CHUNK_METADATA_TEMP_FILE_SUFFIX);
@@ -302,6 +320,15 @@ public class TsFileIOWriter implements AutoCloseable {
     chunkHeader.serializeTo(out.wrapAsStream());
     out.write(chunk.getData());
     endCurrentChunk();
+  }
+
+  public void writeChunkMetadata(ChunkMetadata chunkMetadata) {
+    if (enableMemoryControl) {
+      this.currentChunkMetadataSize += chunkMetadata.calculateRamSize();
+    }
+    chunkMetadataCount++;
+    chunkMetadataList.add(currentChunkMetadata);
+    currentChunkMetadata = null;
   }
 
   /** end chunk and write some log. */
