@@ -41,7 +41,7 @@ public class LocalFSOutputFactory implements FileOutputFactory {
       if (parentDirectory != null) {
         file.getParentFile().mkdirs();
       }
-      return new LocalTsFileOutput(new FileOutputStream(file, append));
+      return new LocalTsFileOutput(new FileOutputStream(file, append), append);
     } catch (IOException e) {
       logger.error("Failed to get TsFile output of file: {}, ", filePath, e);
       return null;

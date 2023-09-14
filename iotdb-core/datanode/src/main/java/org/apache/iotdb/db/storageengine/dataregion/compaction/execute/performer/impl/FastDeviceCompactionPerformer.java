@@ -31,7 +31,9 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.Com
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.MultiTsFileDeviceIterator;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.writer.AbstractCompactionWriter;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.writer.FastDeviceCrossCompactionWriter;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.io.CompactionTsFileReader;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.CompactionTaskManager;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.constant.CompactionType;
 import org.apache.iotdb.db.storageengine.dataregion.modification.Modification;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.DeviceTimeIndex;
@@ -74,7 +76,8 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
   private Map<TsFileResource, DeviceTimeIndex> deviceTimeIndexMap;
   private Map<TsFileResource, TsFileSequenceReader> readerCacheMap;
 
-  public FastDeviceCompactionPerformer(List<TsFileResource> seqFiles, List<TsFileResource> unseqFiles) {
+  public FastDeviceCompactionPerformer(
+      List<TsFileResource> seqFiles, List<TsFileResource> unseqFiles) {
     this.seqFiles = seqFiles;
     this.unseqFiles = unseqFiles;
     this.deviceTimeIndexMap = new HashMap<>();
@@ -92,27 +95,41 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
 
     initReaderCacheMap();
 
-    try (MultiTsFileDeviceIterator deviceIterator = new MultiTsFileDeviceIterator(seqFiles, unseqFiles, readerCacheMap)) {
-      FastDeviceCrossCompactionWriter compactionWriter = new FastDeviceCrossCompactionWriter(seqFiles, seqFiles, readerCacheMap);
+    try (MultiTsFileDeviceIterator deviceIterator =
+        new MultiTsFileDeviceIterator(seqFiles, unseqFiles, readerCacheMap)) {
+      FastDeviceCrossCompactionWriter compactionWriter =
+          new FastDeviceCrossCompactionWriter(seqFiles, seqFiles, readerCacheMap);
       while (deviceIterator.hasNextDevice()) {
         checkThreadInterrupt();
 
         Pair<String, Boolean> deviceIsAlignedPair = deviceIterator.nextDevice();
         String device = deviceIsAlignedPair.left;
         boolean isAligned = deviceIsAlignedPair.right;
+        compactionWriter.startChunkGroup(device, isAligned);
 
-        List<TsFileResource> sortedUnseqFilesOfCurrentDevice = unseqFiles.stream()
-            .filter(resource -> !deviceTimeIndexMap.get(resource).definitelyNotContains(device))
-            .sorted(Comparator.comparingLong(resource -> deviceTimeIndexMap.get(resource).getStartTime(device)))
-            .collect(Collectors.toList());
-        List<TsFileResource> sortedSeqFilesOfCurrentDevice = seqFiles.stream()
-            .filter(resource -> !deviceTimeIndexMap.get(resource).definitelyNotContains(device))
-            .sorted(Comparator.comparingLong(resource -> deviceTimeIndexMap.get(resource).getStartTime(device)))
-            .collect(Collectors.toList());
+        List<TsFileResource> sortedUnseqFilesOfCurrentDevice =
+            unseqFiles.stream()
+                .filter(resource -> !deviceTimeIndexMap.get(resource).definitelyNotContains(device))
+                .sorted(
+                    Comparator.comparingLong(
+                        resource -> deviceTimeIndexMap.get(resource).getStartTime(device)))
+                .collect(Collectors.toList());
+        List<TsFileResource> sortedSeqFilesOfCurrentDevice =
+            seqFiles.stream()
+                .filter(resource -> !deviceTimeIndexMap.get(resource).definitelyNotContains(device))
+                .sorted(
+                    Comparator.comparingLong(
+                        resource -> deviceTimeIndexMap.get(resource).getStartTime(device)))
+                .collect(Collectors.toList());
 
         if (sortedUnseqFilesOfCurrentDevice.isEmpty()) {
           // todo: update chunkMetadata
           copyDeviceChunkMetadata(compactionWriter, sortedSeqFilesOfCurrentDevice, device);
+          compactionWriter.endChunkGroup();
+          // check whether to flush chunk metadata or not
+          compactionWriter.checkAndMayFlushChunkMetadata();
+          // Add temp file metrics
+          subTaskSummary.setTemporalFileSize(compactionWriter.getWriterSize());
           continue;
         }
 
@@ -121,9 +138,11 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
         sortedSeqFilesOfCurrentDevice.addAll(sortedUnseqFilesOfCurrentDevice);
         sortedSeqFilesOfCurrentDevice.sort(Comparator.comparingLong(resource -> deviceTimeIndexMap.get(resource).getStartTime(device)));
         if (isAligned) {
-          compactAlignedSeries(device, deviceIterator, compactionWriter, sortedSeqFilesOfCurrentDevice);
+          compactAlignedSeries(
+              device, deviceIterator, compactionWriter, sortedSeqFilesOfCurrentDevice);
         } else {
-          compactNonAlignedSeries(device, deviceIterator, compactionWriter, sortedSeqFilesOfCurrentDevice);
+          compactNonAlignedSeries(
+              device, deviceIterator, compactionWriter, sortedSeqFilesOfCurrentDevice);
         }
 
         compactionWriter.endChunkGroup();
@@ -136,12 +155,14 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
       CompactionUtils.updatePlanIndexes(Collections.emptyList(), seqFiles, unseqFiles);
     } catch (IOException e) {
       // todo
+      e.printStackTrace();
     } finally {
       // todo
     }
   }
 
-  private List<DeviceTimeIndex> buildDeviceTimeIndexList(List<TsFileResource> resources) throws IOException {
+  private List<DeviceTimeIndex> buildDeviceTimeIndexList(List<TsFileResource> resources)
+      throws IOException {
     List<DeviceTimeIndex> deviceTimeIndexList = new ArrayList<>(resources.size());
     for (TsFileResource resource : resources) {
       DeviceTimeIndex deviceTimeIndex = getDeviceTimeIndex(resource);
@@ -161,14 +182,27 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
 
   private void moveMetadataToTempFile(File srcFile, File dstFile) {
     try (TsFileSequenceReader reader = new TsFileSequenceReader(srcFile.getAbsolutePath());
-      FileChannel srcChannel = FileChannel.open(srcFile.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
-      FileChannel dstChannel = FileChannel.open(dstFile.toPath(), StandardOpenOption.WRITE)
-    ) {
+        FileChannel srcChannel =
+            FileChannel.open(srcFile.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
+        FileChannel dstChannel = FileChannel.open(dstFile.toPath(), StandardOpenOption.WRITE)) {
+      long fileSize = srcChannel.size();
       long metadataSize = reader.getAllMetadataSize();
-      srcChannel.transferFrom(dstChannel, srcChannel.size() - metadataSize, metadataSize);
-      srcChannel.truncate(metadataSize);
+      long transferSize = srcChannel.transferTo(fileSize - metadataSize, metadataSize, dstChannel);
+      if (transferSize != metadataSize) {
+        throw new RuntimeException();
+      }
+      dstChannel.force(true);
+      // release read lock
+      // acquire write lock
+      srcChannel.truncate(fileSize - metadataSize);
+      srcChannel.force(true);
+      // update status separate-metadata
+      // release write lock
+
+      // acquire read lock
     } catch (IOException e) {
       // todo
+      e.printStackTrace();
     }
   }
 
@@ -177,20 +211,28 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
       File dataFile = resource.getTsFile();
       File metadataFile = new File(dataFile.getAbsolutePath() + ".mt");
 
-      CompactingTsFileInput tsFileInput = new CompactingTsFileInput(dataFile.toPath(), metadataFile.toPath());
+      CompactingTsFileInput tsFileInput =
+          new CompactingTsFileInput(dataFile.toPath(), metadataFile.toPath());
 
-      TsFileSequenceReader reader = new TsFileSequenceReader(tsFileInput);
+      TsFileSequenceReader reader = new CompactionTsFileReader(tsFileInput, CompactionType.CROSS_COMPACTION);
       readerCacheMap.put(resource, reader);
     }
     for (TsFileResource resource : unseqFiles) {
-      readerCacheMap.put(resource, new TsFileSequenceReader(resource.getTsFile().getAbsolutePath()));
+      readerCacheMap.put(
+          resource, new TsFileSequenceReader(resource.getTsFile().getAbsolutePath()));
     }
   }
 
-  private void copyDeviceChunkMetadata(FastDeviceCrossCompactionWriter compactionWriter, List<TsFileResource> resources, String device) throws IOException {
+  private void copyDeviceChunkMetadata(
+      FastDeviceCrossCompactionWriter compactionWriter,
+      List<TsFileResource> resources,
+      String device)
+      throws IOException {
     for (TsFileResource resource : resources) {
-      Map<String, List<ChunkMetadata>> measurementChunkMetadataListMap = readerCacheMap.get(resource).readChunkMetadataInDevice(device);
-      for (Map.Entry<String, List<ChunkMetadata>> measurementChunkMetadataList : measurementChunkMetadataListMap.entrySet()) {
+      Map<String, List<ChunkMetadata>> measurementChunkMetadataListMap =
+          readerCacheMap.get(resource).readChunkMetadataInDevice(device);
+      for (Map.Entry<String, List<ChunkMetadata>> measurementChunkMetadataList :
+          measurementChunkMetadataListMap.entrySet()) {
         List<ChunkMetadata> chunkMetadataList = measurementChunkMetadataList.getValue();
         if (chunkMetadataList == null || chunkMetadataList.isEmpty()) {
           continue;
@@ -199,10 +241,14 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
       }
       compactionWriter.checkAndMayFlushChunkMetadata();
     }
-
   }
 
-  private void compactNonAlignedSeries(String device, MultiTsFileDeviceIterator deviceIterator, AbstractCompactionWriter compactionWriter, List<TsFileResource> sortedSourceFiles) throws IOException {
+  private void compactNonAlignedSeries(
+      String device,
+      MultiTsFileDeviceIterator deviceIterator,
+      AbstractCompactionWriter compactionWriter,
+      List<TsFileResource> sortedSourceFiles)
+      throws IOException {
     // measurement -> tsfile resource -> timeseries metadata <startOffset, endOffset>
     // Get all measurements of the current device. Also get start offset and end offset of each
     // timeseries metadata, in order to facilitate the reading of chunkMetadata directly by this
@@ -259,7 +305,12 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
     }
   }
 
-  private void compactAlignedSeries(String device, MultiTsFileDeviceIterator deviceIterator, AbstractCompactionWriter compactionWriter, List<TsFileResource> sortedSourceFiles) throws IOException, PageException, IllegalPathException, WriteProcessException {
+  private void compactAlignedSeries(
+      String device,
+      MultiTsFileDeviceIterator deviceIterator,
+      AbstractCompactionWriter compactionWriter,
+      List<TsFileResource> sortedSourceFiles)
+      throws IOException, PageException, IllegalPathException, WriteProcessException {
     // measurement -> tsfile resource -> timeseries metadata <startOffset, endOffset>, including
     // empty value chunk metadata
     Map<String, Map<TsFileResource, Pair<Long, Long>>> timeseriesMetadataOffsetMap =
@@ -281,21 +332,20 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
 
     FastCompactionTaskSummary taskSummary = new FastCompactionTaskSummary();
     new FastCompactionPerformerSubTask(
-        compactionWriter,
-        timeseriesMetadataOffsetMap,
-        readerCacheMap,
-        modificationCache,
-        sortedSourceFiles,
-        measurementSchemas,
-        device,
-        taskSummary)
+            compactionWriter,
+            timeseriesMetadataOffsetMap,
+            readerCacheMap,
+            modificationCache,
+            sortedSourceFiles,
+            measurementSchemas,
+            device,
+            taskSummary)
         .call();
     subTaskSummary.increase(taskSummary);
   }
 
   @Override
-  public void setTargetFiles(List<TsFileResource> targetFiles) {
-  }
+  public void setTargetFiles(List<TsFileResource> targetFiles) {}
 
   @Override
   public void setSummary(CompactionTaskSummary summary) {
@@ -316,8 +366,7 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
   private void checkThreadInterrupt() throws InterruptedException {
     if (Thread.interrupted() || subTaskSummary.isCancel()) {
       throw new InterruptedException(
-          String.format(
-              "[Compaction] compaction for target file %s abort", seqFiles.toString()));
+          String.format("[Compaction] compaction for target file %s abort", seqFiles.toString()));
     }
   }
 

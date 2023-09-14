@@ -31,6 +31,7 @@ import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
 import org.apache.iotdb.tsfile.read.common.Chunk;
 import org.apache.iotdb.tsfile.read.common.TimeRange;
 import org.apache.iotdb.tsfile.read.reader.CompactingTsFileInput;
+
 import org.junit.Test;
 
 import java.io.BufferedInputStream;
@@ -48,7 +49,8 @@ import java.util.Map;
 
 public class CompactingTsFileInputTest extends AbstractCompactionTest {
   @Test
-  public void test1() throws IOException, MetadataException, WriteProcessException, URISyntaxException {
+  public void test1()
+      throws IOException, MetadataException, WriteProcessException, URISyntaxException {
     TsFileResource resource = createEmptyFileAndResource(true);
     File file = resource.getTsFile();
     String metadataFilePath = file.getAbsolutePath() + ".mt";
@@ -56,15 +58,21 @@ public class CompactingTsFileInputTest extends AbstractCompactionTest {
     long splitLength;
     try (CompactionTestFileWriter writer = new CompactionTestFileWriter(resource)) {
       writer.startChunkGroup("d0");
-      writer.generateSimpleNonAlignedSeriesToCurrentDevice("s1", new TimeRange[] {new TimeRange(1000, 2000)}, TSEncoding.PLAIN, CompressionType.UNCOMPRESSED);
+      writer.generateSimpleNonAlignedSeriesToCurrentDevice(
+          "s1",
+          new TimeRange[] {new TimeRange(1000, 2000)},
+          TSEncoding.PLAIN,
+          CompressionType.UNCOMPRESSED);
       writer.endChunkGroup();
       splitLength = file.length();
       writer.endFile();
     }
 
-    BufferedInputStream bis = new BufferedInputStream(Files.newInputStream(Paths.get(file.getAbsolutePath())));
+    BufferedInputStream bis =
+        new BufferedInputStream(Files.newInputStream(Paths.get(file.getAbsolutePath())));
     bis.skip(splitLength);
-    BufferedOutputStream os = new BufferedOutputStream(Files.newOutputStream(Paths.get(metadataFilePath)));
+    BufferedOutputStream os =
+        new BufferedOutputStream(Files.newOutputStream(Paths.get(metadataFilePath)));
     byte[] data = new byte[1024];
     int readSize;
     while ((readSize = bis.read(data)) != -1) {
@@ -73,7 +81,6 @@ public class CompactingTsFileInputTest extends AbstractCompactionTest {
     os.flush();
     new RandomAccessFile(file, "rw").setLength(splitLength);
 
-
     Path dataPath = resource.getTsFile().toPath();
     Path metadataPath = new File(resource.getTsFile().getAbsolutePath() + ".mt").toPath();
     CompactingTsFileInput compactingTsFileInput = new CompactingTsFileInput(dataPath, metadataPath);
@@ -81,10 +88,13 @@ public class CompactingTsFileInputTest extends AbstractCompactionTest {
     try (TsFileSequenceReader reader = new TsFileSequenceReader(compactingTsFileInput)) {
       List<String> allDevices = reader.getAllDevices();
       for (String device : allDevices) {
-        Iterator<Map<String, List<ChunkMetadata>>> measurementChunkMetadataListMapIterator = reader.getMeasurementChunkMetadataListMapIterator(device);
+        Iterator<Map<String, List<ChunkMetadata>>> measurementChunkMetadataListMapIterator =
+            reader.getMeasurementChunkMetadataListMapIterator(device);
         while (measurementChunkMetadataListMapIterator.hasNext()) {
-          Map<String, List<ChunkMetadata>> measurementChunkMetadataListmap = measurementChunkMetadataListMapIterator.next();
-          for (Map.Entry<String, List<ChunkMetadata>> measurementChunkMetadataList : measurementChunkMetadataListmap.entrySet()) {
+          Map<String, List<ChunkMetadata>> measurementChunkMetadataListmap =
+              measurementChunkMetadataListMapIterator.next();
+          for (Map.Entry<String, List<ChunkMetadata>> measurementChunkMetadataList :
+              measurementChunkMetadataListmap.entrySet()) {
             System.out.println(measurementChunkMetadataList.getKey());
             System.out.println(measurementChunkMetadataList.getValue());
             for (ChunkMetadata chunkMetadata : measurementChunkMetadataList.getValue()) {

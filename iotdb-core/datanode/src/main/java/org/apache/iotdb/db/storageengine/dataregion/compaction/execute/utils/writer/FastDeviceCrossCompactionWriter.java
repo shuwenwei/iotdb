@@ -29,11 +29,16 @@ import java.util.List;
 import java.util.Map;
 
 public class FastDeviceCrossCompactionWriter extends FastCrossCompactionWriter {
-  public FastDeviceCrossCompactionWriter(List<TsFileResource> targetResources, List<TsFileResource> seqSourceResources, Map<TsFileResource, TsFileSequenceReader> readerMap) throws IOException {
+  public FastDeviceCrossCompactionWriter(
+      List<TsFileResource> targetResources,
+      List<TsFileResource> seqSourceResources,
+      Map<TsFileResource, TsFileSequenceReader> readerMap)
+      throws IOException {
     super(targetResources, seqSourceResources, readerMap, true);
   }
 
-  public void writeChunkMetadataList(TsFileResource resource, List<ChunkMetadata> chunkMetadataList) throws IOException {
+  public void writeChunkMetadataList(TsFileResource resource, List<ChunkMetadata> chunkMetadataList)
+      throws IOException {
     for (CompactionTsFileWriter targetFileWriter : this.targetFileWriters) {
       if (targetFileWriter.getFile().equals(resource.getTsFile())) {
         for (ChunkMetadata chunkMetadata : chunkMetadataList) {

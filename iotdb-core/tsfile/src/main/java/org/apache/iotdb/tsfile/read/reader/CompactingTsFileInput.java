@@ -19,7 +19,6 @@
 
 package org.apache.iotdb.tsfile.read.reader;
 
-
 import org.apache.commons.io.input.BoundedInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,12 +102,11 @@ public class CompactingTsFileInput implements TsFileInput {
         return metadataFileChannel.read(dst, position - dataSize);
       } else {
         int readSize = dst.remaining();
-        if (position + readSize < dataSize) {
+        if (position + readSize <= dataSize) {
           return dataFileChannel.read(dst, position);
         }
-        int readDataSize = (int) (dataSize - position - 1);
-        return dataFileChannel.read((ByteBuffer) dst.limit(readDataSize), position)
-            + metadataFileChannel.read((ByteBuffer) dst.limit(readSize), 0);
+        int readDataSize = (int) (dataSize - position);
+        return dataFileChannel.read(dst, position) + metadataFileChannel.read(dst, 0);
       }
     } catch (ClosedByInterruptException e) {
       logger.warn(
@@ -122,7 +120,9 @@ public class CompactingTsFileInput implements TsFileInput {
 
   @Override
   public InputStream wrapAsInputStream() {
-    return new SequenceInputStream(new BoundedInputStream(Channels.newInputStream(dataFileChannel), dataSize), Channels.newInputStream(metadataFileChannel));
+    return new SequenceInputStream(
+        new BoundedInputStream(Channels.newInputStream(dataFileChannel), dataSize),
+        Channels.newInputStream(metadataFileChannel));
   }
 
   @Override
@@ -140,5 +140,4 @@ public class CompactingTsFileInput implements TsFileInput {
   public String getFilePath() {
     return filePath;
   }
-
 }

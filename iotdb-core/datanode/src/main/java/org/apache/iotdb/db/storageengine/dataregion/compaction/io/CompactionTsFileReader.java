@@ -29,6 +29,7 @@ import org.apache.iotdb.tsfile.file.metadata.TimeseriesMetadata;
 import org.apache.iotdb.tsfile.read.TsFileDeviceIterator;
 import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
 import org.apache.iotdb.tsfile.read.common.Chunk;
+import org.apache.iotdb.tsfile.read.reader.TsFileInput;
 import org.apache.iotdb.tsfile.utils.Pair;
 
 import java.io.IOException;
@@ -63,6 +64,11 @@ public class CompactionTsFileReader extends TsFileSequenceReader {
    */
   public CompactionTsFileReader(String file, CompactionType compactionType) throws IOException {
     super(file);
+    this.compactionType = compactionType;
+  }
+
+  public CompactionTsFileReader(TsFileInput tsFileInput, CompactionType compactionType) throws IOException {
+    super(tsFileInput);
     this.compactionType = compactionType;
   }
 

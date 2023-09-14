@@ -34,10 +34,18 @@ public class LocalTsFileOutput extends OutputStream implements TsFileOutput {
   private BufferedOutputStream bufferedStream;
   private long position;
 
-  public LocalTsFileOutput(FileOutputStream outputStream) {
+  public LocalTsFileOutput(FileOutputStream outputStream) throws IOException {
+    this(outputStream, false);
+  }
+
+  public LocalTsFileOutput(FileOutputStream outputStream, boolean append) throws IOException {
     this.outputStream = outputStream;
     this.bufferedStream = new BufferedOutputStream(outputStream);
-    position = 0;
+    if (append) {
+      position = outputStream.getChannel().position();
+    } else {
+      position = 0;
+    }
   }
 
   @Override

@@ -43,8 +43,13 @@ public class CompactionTsFileWriter extends TsFileIOWriter {
   private volatile boolean isWritingAligned = false;
 
   public CompactionTsFileWriter(
-      File file, boolean enableMemoryControl, long maxMetadataSize, CompactionType type, boolean append) throws IOException {
-    super(file, enableMemoryControl, maxMetadataSize);
+      File file,
+      boolean enableMemoryControl,
+      long maxMetadataSize,
+      CompactionType type,
+      boolean append)
+      throws IOException {
+    super(file, enableMemoryControl, maxMetadataSize, append);
     this.type = type;
   }
 

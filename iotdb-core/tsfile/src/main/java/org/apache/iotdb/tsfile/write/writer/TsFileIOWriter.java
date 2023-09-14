@@ -130,7 +130,6 @@ public class TsFileIOWriter implements AutoCloseable {
     this(file, false);
   }
 
-
   /**
    * for writing a new tsfile.
    *
@@ -144,7 +143,9 @@ public class TsFileIOWriter implements AutoCloseable {
     if (resourceLogger.isDebugEnabled()) {
       resourceLogger.debug("{} writer is opened.", file.getName());
     }
-    startFile();
+    if (!append) {
+      startFile();
+    }
   }
 
   /**
@@ -169,7 +170,8 @@ public class TsFileIOWriter implements AutoCloseable {
   }
 
   /** for write with memory control */
-  public TsFileIOWriter(File file, boolean enableMemoryControl, long maxMetadataSize, boolean append)
+  public TsFileIOWriter(
+      File file, boolean enableMemoryControl, long maxMetadataSize, boolean append)
       throws IOException {
     this(file, append);
     this.enableMemoryControl = enableMemoryControl;
