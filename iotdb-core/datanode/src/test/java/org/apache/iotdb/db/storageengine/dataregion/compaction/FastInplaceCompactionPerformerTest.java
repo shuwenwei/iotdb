@@ -27,6 +27,88 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
 
+
+  @Test
+  public void test4() throws IOException {
+    List<TsFileResource> seqFiles = new ArrayList<>();
+
+    List<TsFileResource> unseqFiles = new ArrayList<>();
+    TsFileResource seqResource1 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(10, 20)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+    TsFileResource seqResource2 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(30, 50)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+
+    TsFileResource seqResource3 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(70, 80)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+
+    TsFileResource unseqResource1 =
+        generateSingleNonAlignedSeriesFile(
+            "d2",
+            "s1",
+            new TimeRange[] {new TimeRange(21, 24)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+
+    TsFileResource unseqResource2 =
+        generateSingleNonAlignedSeriesFile(
+            "d2",
+            "s1",
+            new TimeRange[] {new TimeRange(25, 60)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+
+    TsFileResource unseqResource3 =
+        generateSingleNonAlignedSeriesFile(
+            "d2",
+            "s1",
+            new TimeRange[] {new TimeRange(90, 100)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+
+    seqFiles.add(seqResource1);
+    seqFiles.add(seqResource2);
+    seqFiles.add(seqResource3);
+    unseqFiles.add(unseqResource1);
+    unseqFiles.add(unseqResource2);
+    unseqFiles.add(unseqResource3);
+
+    CompactionTaskManager.getInstance().start();
+    CrossSpaceCompactionTask task =
+        new CrossSpaceCompactionTask(
+            0,
+            tsFileManager,
+            seqFiles,
+            unseqFiles,
+            new FastDeviceCompactionPerformer(seqFiles, unseqFiles),
+            new AtomicInteger(0),
+            0,
+            0);
+    task.start();
+
+    System.out.println();
+  }
+
   @Test
   public void test1() throws IOException {
     List<TsFileResource> seqFiles = new ArrayList<>();

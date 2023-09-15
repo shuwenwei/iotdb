@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.writer;
 
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.io.CompactionTsFileWriter;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.tsfile.file.metadata.ChunkMetadata;
@@ -29,23 +30,39 @@ import java.util.List;
 import java.util.Map;
 
 public class FastDeviceCrossCompactionWriter extends FastCrossCompactionWriter {
+
+  boolean[] deviceExistButNotRewrite;
+
   public FastDeviceCrossCompactionWriter(
       List<TsFileResource> targetResources,
       List<TsFileResource> seqSourceResources,
       Map<TsFileResource, TsFileSequenceReader> readerMap)
       throws IOException {
     super(targetResources, seqSourceResources, readerMap, true);
+    this.deviceExistButNotRewrite = new boolean[targetResources.size()];
   }
 
   public void writeChunkMetadataList(TsFileResource resource, List<ChunkMetadata> chunkMetadataList)
       throws IOException {
-    for (CompactionTsFileWriter targetFileWriter : this.targetFileWriters) {
+    for (int i = 0; i < targetFileWriters.size(); i++) {
+      CompactionTsFileWriter targetFileWriter = this.targetFileWriters.get(i);
       if (targetFileWriter.getFile().equals(resource.getTsFile())) {
         for (ChunkMetadata chunkMetadata : chunkMetadataList) {
-          targetFileWriter.writeChunkMetadata(chunkMetadata);
-          targetFileWriter.checkMetadataSizeAndMayFlush();
+          targetFileWriter.directlyWriteChunkMetadata(chunkMetadata);
+          deviceExistButNotRewrite[i] = true;
         }
         return;
+      }
+    }
+  }
+
+  @Override
+  public void endChunkGroup() throws IOException {
+    super.endChunkGroup();
+    for (int i = 0; i < targetFileWriters.size(); i++) {
+      if (deviceExistButNotRewrite[i]) {
+        CompactionUtils.updateResource(targetResources.get(i), targetFileWriters.get(i), deviceId);
+        targetFileWriters.get(i).endChunkGroup();
       }
     }
   }

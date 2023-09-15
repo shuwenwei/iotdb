@@ -56,9 +56,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -134,15 +136,28 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
         }
 
         // todo: select overlap files of current device
+        List<TsFileResource> sortedSourceFiles;
+        if (sortedSeqFilesOfCurrentDevice.isEmpty()) {
+          sortedSourceFiles = sortedUnseqFilesOfCurrentDevice;
+        } else {
+          Set<TsFileResource> selectedSourceFiles = selectSeqFilesToCompact(device, sortedSeqFilesOfCurrentDevice, sortedUnseqFilesOfCurrentDevice);
+          if (sortedSeqFilesOfCurrentDevice.size() != selectedSourceFiles.size()) {
+            sortedSeqFilesOfCurrentDevice.removeAll(selectedSourceFiles);
+            copyDeviceChunkMetadata(compactionWriter, sortedSeqFilesOfCurrentDevice, device);
+          }
+          selectedSourceFiles.addAll(sortedUnseqFilesOfCurrentDevice);
+          sortedSourceFiles = selectedSourceFiles.stream()
+              .sorted(Comparator.comparingLong(f -> deviceTimeIndexMap.get(f).getStartTime(device)))
+              .collect(Collectors.toList());
+        }
 
-        sortedSeqFilesOfCurrentDevice.addAll(sortedUnseqFilesOfCurrentDevice);
-        sortedSeqFilesOfCurrentDevice.sort(Comparator.comparingLong(resource -> deviceTimeIndexMap.get(resource).getStartTime(device)));
+
         if (isAligned) {
           compactAlignedSeries(
-              device, deviceIterator, compactionWriter, sortedSeqFilesOfCurrentDevice);
+              device, deviceIterator, compactionWriter, sortedSourceFiles);
         } else {
           compactNonAlignedSeries(
-              device, deviceIterator, compactionWriter, sortedSeqFilesOfCurrentDevice);
+              device, deviceIterator, compactionWriter, sortedSourceFiles);
         }
 
         compactionWriter.endChunkGroup();
@@ -153,7 +168,7 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
       }
       compactionWriter.endFile();
       CompactionUtils.updatePlanIndexes(Collections.emptyList(), seqFiles, unseqFiles);
-    } catch (IOException e) {
+    } catch (Exception e) {
       // todo
       e.printStackTrace();
     } finally {
@@ -239,8 +254,33 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
         }
         compactionWriter.writeChunkMetadataList(resource, measurementChunkMetadataList.getValue());
       }
-      compactionWriter.checkAndMayFlushChunkMetadata();
     }
+  }
+
+  public Set<TsFileResource> selectSeqFilesToCompact(String device, List<TsFileResource> sortedSeqFiles, List<TsFileResource> sortedUnseqFiles) {
+    Set<TsFileResource> selectedSeqFiles = new HashSet<>();
+    for (TsFileResource sortedUnseqFile : sortedUnseqFiles) {
+      DeviceTimeIndex unseqDeviceTimeIndex = deviceTimeIndexMap.get(sortedUnseqFile);
+      long unseqDeviceStartTime = unseqDeviceTimeIndex.getStartTime(device);
+      long unseqDeviceEndTime = unseqDeviceTimeIndex.getEndTime(device);
+
+      long startDispatchTime = Long.MIN_VALUE;
+      for (TsFileResource sortedSeqFile : sortedSeqFiles) {
+        DeviceTimeIndex seqDeviceTimeIndex = deviceTimeIndexMap.get(sortedSeqFile);
+        long endDispatchTime = seqDeviceTimeIndex.getEndTime(device);
+
+        boolean overlap = unseqDeviceStartTime <= endDispatchTime && unseqDeviceEndTime >= startDispatchTime;
+        if (overlap) {
+          selectedSeqFiles.add(sortedSeqFile);
+        }
+        startDispatchTime = endDispatchTime + 1;
+      }
+    }
+
+    if (selectedSeqFiles.isEmpty()) {
+      selectedSeqFiles.add(sortedSeqFiles.get(sortedSeqFiles.size() - 1));
+    }
+    return selectedSeqFiles;
   }
 
   private void compactNonAlignedSeries(

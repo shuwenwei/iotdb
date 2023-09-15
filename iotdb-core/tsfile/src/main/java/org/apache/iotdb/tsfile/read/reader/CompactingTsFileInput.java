@@ -83,7 +83,7 @@ public class CompactingTsFileInput implements TsFileInput {
       if (this.position() >= dataSize) {
         return metadataFileChannel.read(dst);
       } else {
-        return dataFileChannel.read(dst);
+        return dataFileChannel.read(dst) + metadataFileChannel.read(dst);
       }
     } catch (ClosedByInterruptException e) {
       logger.warn(
@@ -105,7 +105,6 @@ public class CompactingTsFileInput implements TsFileInput {
         if (position + readSize <= dataSize) {
           return dataFileChannel.read(dst, position);
         }
-        int readDataSize = (int) (dataSize - position);
         return dataFileChannel.read(dst, position) + metadataFileChannel.read(dst, 0);
       }
     } catch (ClosedByInterruptException e) {
