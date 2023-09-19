@@ -5,7 +5,6 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.Cros
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.CompactionTaskManager;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.utils.CompactionTestFileWriter;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
-import org.apache.iotdb.tsfile.file.header.ChunkHeader;
 import org.apache.iotdb.tsfile.file.header.PageHeader;
 import org.apache.iotdb.tsfile.file.metadata.ChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.enums.CompressionType;
@@ -13,9 +12,9 @@ import org.apache.iotdb.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
 import org.apache.iotdb.tsfile.read.common.Chunk;
 import org.apache.iotdb.tsfile.read.common.TimeRange;
-
 import org.apache.iotdb.tsfile.read.common.block.TsBlock;
 import org.apache.iotdb.tsfile.read.reader.chunk.ChunkReader;
+
 import org.junit.Test;
 
 import java.io.IOException;
@@ -26,7 +25,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
-
 
   @Test
   public void test4() throws IOException {
@@ -192,9 +190,13 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
 
   @Test
   public void test2() {
-    try (TsFileSequenceReader reader = new TsFileSequenceReader("/home/sww/source-codes/iotdb/iotdb-core/datanode/target/data/sequence/root.testsg/0/0/0-18-0-0.tsfile")) {
-      final Map<String, List<ChunkMetadata>> deviceChunkMetadataMap = reader.readChunkMetadataInDevice("root.testsg.d1");
-      for (Map.Entry<String, List<ChunkMetadata>> measurementChunkMetadataListEntry : deviceChunkMetadataMap.entrySet()) {
+    try (TsFileSequenceReader reader =
+        new TsFileSequenceReader(
+            "/home/sww/source-codes/iotdb/iotdb-core/datanode/target/data/sequence/root.testsg/0/0/0-18-0-0.tsfile")) {
+      final Map<String, List<ChunkMetadata>> deviceChunkMetadataMap =
+          reader.readChunkMetadataInDevice("root.testsg.d1");
+      for (Map.Entry<String, List<ChunkMetadata>> measurementChunkMetadataListEntry :
+          deviceChunkMetadataMap.entrySet()) {
         System.out.println(measurementChunkMetadataListEntry.getKey());
         for (ChunkMetadata chunkMetadata : measurementChunkMetadataListEntry.getValue()) {
           System.out.println(chunkMetadata);
@@ -202,7 +204,8 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
           final Chunk chunk = reader.readMemChunk(chunkMetadata);
           ChunkReader chunkReader = new ChunkReader(chunk);
 
-          final PageHeader pageHeader = PageHeader.deserializeFrom(chunk.getData(), chunkMetadata.getStatistics());
+          final PageHeader pageHeader =
+              PageHeader.deserializeFrom(chunk.getData(), chunkMetadata.getStatistics());
           final ByteBuffer pageBuffer = chunkReader.readPageDataWithoutUncompressing(pageHeader);
 
           final TsBlock tsBlock = chunkReader.readPageData(pageHeader, pageBuffer);

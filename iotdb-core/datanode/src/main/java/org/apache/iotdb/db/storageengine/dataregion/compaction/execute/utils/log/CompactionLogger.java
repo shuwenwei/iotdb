@@ -30,6 +30,8 @@ import java.util.List;
 /** MergeLogger records the progress of a merge in file "merge.log" as text lines. */
 public class CompactionLogger implements AutoCloseable {
 
+  public static final String IN_PLACE_CROSS_COMPACTION_LOG_NAME_SUFFIX =
+      ".in-place-cross-compaction.log";
   public static final String CROSS_COMPACTION_LOG_NAME_SUFFIX = ".cross-compaction.log";
   public static final String CROSS_COMPACTION_LOG_NAME_FROM_OLD = "merge.log";
   public static final String INNER_COMPACTION_LOG_NAME_SUFFIX = ".inner-compaction.log";
@@ -82,9 +84,10 @@ public class CompactionLogger implements AutoCloseable {
     logStream.flush();
   }
 
-  public void logFile(TsFileResource tsFile, long dataSize, String flag) {
+  public void logFile(TsFileResource tsFile, String flag, long dataSize, long metaSize)
+      throws IOException {}
 
-  }
+  public void logFile(TsFileResource tsFile, long dataSize, String flag) {}
 
   public static File[] findCompactionLogs(boolean isInnerSpace, String directory) {
     String compactionLogSuffix =

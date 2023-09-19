@@ -648,7 +648,8 @@ public class TsFileResource {
   }
 
   public boolean isCompacting() {
-    return getStatus() == TsFileResourceStatus.COMPACTING;
+    return getStatus() == TsFileResourceStatus.COMPACTING
+        || getStatus() == TsFileResourceStatus.SPLIT_DURING_COMPACTING;
   }
 
   public boolean isCompactionCandidate() {
@@ -682,6 +683,8 @@ public class TsFileResource {
         return compareAndSetStatus(TsFileResourceStatus.UNCLOSED, TsFileResourceStatus.NORMAL)
             || compareAndSetStatus(TsFileResourceStatus.COMPACTING, TsFileResourceStatus.NORMAL)
             || compareAndSetStatus(
+                TsFileResourceStatus.SPLIT_DURING_COMPACTING, TsFileResourceStatus.NORMAL)
+            || compareAndSetStatus(
                 TsFileResourceStatus.COMPACTION_CANDIDATE, TsFileResourceStatus.NORMAL);
       case UNCLOSED:
         // TsFile cannot be set back to UNCLOSED so false is always returned
@@ -693,6 +696,9 @@ public class TsFileResource {
       case COMPACTING:
         return compareAndSetStatus(
             TsFileResourceStatus.COMPACTION_CANDIDATE, TsFileResourceStatus.COMPACTING);
+      case SPLIT_DURING_COMPACTING:
+        return compareAndSetStatus(
+            TsFileResourceStatus.COMPACTING, TsFileResourceStatus.SPLIT_DURING_COMPACTING);
       case COMPACTION_CANDIDATE:
         return compareAndSetStatus(
             TsFileResourceStatus.NORMAL, TsFileResourceStatus.COMPACTION_CANDIDATE);

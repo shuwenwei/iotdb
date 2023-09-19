@@ -297,7 +297,7 @@ public class CrossSpaceCompactionTask extends AbstractCompactionTask {
         && this.performer.getClass().isInstance(otherCrossCompactionTask.performer);
   }
 
-   protected void releaseAllLocksAndResetStatus() {
+  protected void releaseAllLocksAndResetStatus() {
     resetCompactionCandidateStatusForAllSourceFiles();
     for (TsFileResource tsFileResource : holdReadLockList) {
       tsFileResource.readUnlock();
@@ -415,7 +415,8 @@ public class CrossSpaceCompactionTask extends AbstractCompactionTask {
 
   @Override
   protected void createSummary() {
-    if (performer instanceof FastCompactionPerformer || performer instanceof FastDeviceCompactionPerformer) {
+    if (performer instanceof FastCompactionPerformer
+        || performer instanceof FastDeviceCompactionPerformer) {
       this.summary = new FastCompactionTaskSummary();
     } else {
       this.summary = new CompactionTaskSummary();

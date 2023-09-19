@@ -67,7 +67,8 @@ public class CompactionTsFileReader extends TsFileSequenceReader {
     this.compactionType = compactionType;
   }
 
-  public CompactionTsFileReader(TsFileInput tsFileInput, CompactionType compactionType) throws IOException {
+  public CompactionTsFileReader(TsFileInput tsFileInput, CompactionType compactionType)
+      throws IOException {
     super(tsFileInput);
     this.compactionType = compactionType;
   }

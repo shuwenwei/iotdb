@@ -161,8 +161,8 @@ public class CompactionUtils {
       List<TsFileResource> seqResources,
       List<TsFileResource> unseqResources,
       List<Long> dataSizeOfSeqFilesBeforeCompaction,
-      Map<TsFileResource, Set<String>> rewriteDeviceOfSeqFiles
-  ) throws IOException, IllegalPathException {
+      Map<TsFileResource, Set<String>> rewriteDeviceOfSeqFiles)
+      throws IOException, IllegalPathException {
     Set<Modification> modifications = new HashSet<>();
     for (TsFileResource unseqFile : unseqResources) {
       modifications.addAll(ModificationFile.getCompactionMods(unseqFile).getModifications());
@@ -173,7 +173,8 @@ public class CompactionUtils {
       Set<Modification> seqModifications =
           new HashSet<>(ModificationFile.getCompactionMods(seqResources.get(i)).getModifications());
       seqModifications.addAll(modifications);
-      Set<String> rewriteDevices = rewriteDeviceOfSeqFiles.getOrDefault(seqFile, Collections.emptySet());
+      Set<String> rewriteDevices =
+          rewriteDeviceOfSeqFiles.getOrDefault(seqFile, Collections.emptySet());
 
       try (ModificationFile modificationFile = ModificationFile.getNormalMods(seqFile)) {
         for (Modification modification : seqModifications) {
@@ -183,7 +184,12 @@ public class CompactionUtils {
           modificationFile.write(modification);
         }
         for (String device : rewriteDevices) {
-          Deletion modification = new Deletion(new PartialPath(device), dataSizeOfSeqFilesBeforeCompaction.get(i), Long.MIN_VALUE, Long.MAX_VALUE);
+          Deletion modification =
+              new Deletion(
+                  new PartialPath(device),
+                  dataSizeOfSeqFilesBeforeCompaction.get(i),
+                  Long.MIN_VALUE,
+                  Long.MAX_VALUE);
           modificationFile.write(modification);
         }
       }

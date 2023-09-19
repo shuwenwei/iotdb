@@ -24,5 +24,7 @@ public enum TsFileResourceStatus {
   NORMAL,
   COMPACTION_CANDIDATE,
   COMPACTING,
+  // Indicate that the TsFile is split into data part and meta part during compacting
+  SPLIT_DURING_COMPACTING,
   DELETED
 }

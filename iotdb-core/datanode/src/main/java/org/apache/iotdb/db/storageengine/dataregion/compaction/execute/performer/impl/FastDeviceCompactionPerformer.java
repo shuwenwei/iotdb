@@ -141,29 +141,31 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
         if (sortedSeqFilesOfCurrentDevice.isEmpty()) {
           sortedSourceFiles = sortedUnseqFilesOfCurrentDevice;
         } else {
-          Set<TsFileResource> selectedSourceFiles = selectSeqFilesToCompact(device, sortedSeqFilesOfCurrentDevice, sortedUnseqFilesOfCurrentDevice);
+          Set<TsFileResource> selectedSourceFiles =
+              selectSeqFilesToCompact(
+                  device, sortedSeqFilesOfCurrentDevice, sortedUnseqFilesOfCurrentDevice);
           if (sortedSeqFilesOfCurrentDevice.size() != selectedSourceFiles.size()) {
             sortedSeqFilesOfCurrentDevice.removeAll(selectedSourceFiles);
             copyDeviceChunkMetadata(compactionWriter, sortedSeqFilesOfCurrentDevice, device);
           }
           for (TsFileResource selectedSourceFile : selectedSourceFiles) {
-            Set<String> rewriteDeviceOfCurrentFile = rewriteDevices.getOrDefault(selectedSourceFile, new HashSet<>());
+            Set<String> rewriteDeviceOfCurrentFile =
+                rewriteDevices.getOrDefault(selectedSourceFile, new HashSet<>());
             rewriteDeviceOfCurrentFile.add(device);
             rewriteDevices.put(selectedSourceFile, rewriteDeviceOfCurrentFile);
           }
           selectedSourceFiles.addAll(sortedUnseqFilesOfCurrentDevice);
-          sortedSourceFiles = selectedSourceFiles.stream()
-              .sorted(Comparator.comparingLong(f -> deviceTimeIndexMap.get(f).getStartTime(device)))
-              .collect(Collectors.toList());
+          sortedSourceFiles =
+              selectedSourceFiles.stream()
+                  .sorted(
+                      Comparator.comparingLong(f -> deviceTimeIndexMap.get(f).getStartTime(device)))
+                  .collect(Collectors.toList());
         }
 
-
         if (isAligned) {
-          compactAlignedSeries(
-              device, deviceIterator, compactionWriter, sortedSourceFiles);
+          compactAlignedSeries(device, deviceIterator, compactionWriter, sortedSourceFiles);
         } else {
-          compactNonAlignedSeries(
-              device, deviceIterator, compactionWriter, sortedSourceFiles);
+          compactNonAlignedSeries(device, deviceIterator, compactionWriter, sortedSourceFiles);
         }
 
         compactionWriter.endChunkGroup();
@@ -235,7 +237,8 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
       CompactingTsFileInput tsFileInput =
           new CompactingTsFileInput(dataFile.toPath(), metadataFile.toPath());
 
-      TsFileSequenceReader reader = new CompactionTsFileReader(tsFileInput, CompactionType.CROSS_COMPACTION);
+      TsFileSequenceReader reader =
+          new CompactionTsFileReader(tsFileInput, CompactionType.CROSS_COMPACTION);
       readerCacheMap.put(resource, reader);
     }
     for (TsFileResource resource : unseqFiles) {
@@ -245,9 +248,7 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
   }
 
   private void copyDeviceChunkMetadata(
-      InPlaceCrossCompactionWriter compactionWriter,
-      List<TsFileResource> resources,
-      String device)
+      InPlaceCrossCompactionWriter compactionWriter, List<TsFileResource> resources, String device)
       throws IOException {
     for (TsFileResource resource : resources) {
       Map<String, List<ChunkMetadata>> measurementChunkMetadataListMap =
@@ -263,7 +264,8 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
     }
   }
 
-  public Set<TsFileResource> selectSeqFilesToCompact(String device, List<TsFileResource> sortedSeqFiles, List<TsFileResource> sortedUnseqFiles) {
+  public Set<TsFileResource> selectSeqFilesToCompact(
+      String device, List<TsFileResource> sortedSeqFiles, List<TsFileResource> sortedUnseqFiles) {
     Set<TsFileResource> selectedSeqFiles = new HashSet<>();
     for (TsFileResource sortedUnseqFile : sortedUnseqFiles) {
       DeviceTimeIndex unseqDeviceTimeIndex = deviceTimeIndexMap.get(sortedUnseqFile);
@@ -278,7 +280,8 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
         DeviceTimeIndex seqDeviceTimeIndex = deviceTimeIndexMap.get(sortedSeqFile);
         long endDispatchTime = seqDeviceTimeIndex.getEndTime(device);
 
-        boolean overlap = unseqDeviceStartTime <= endDispatchTime && unseqDeviceEndTime >= startDispatchTime;
+        boolean overlap =
+            unseqDeviceStartTime <= endDispatchTime && unseqDeviceEndTime >= startDispatchTime;
         if (overlap) {
           selectedSeqFiles.add(sortedSeqFile);
         }
