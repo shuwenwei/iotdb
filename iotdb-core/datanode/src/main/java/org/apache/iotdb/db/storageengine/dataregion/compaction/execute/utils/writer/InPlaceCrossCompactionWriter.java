@@ -29,11 +29,11 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-public class FastDeviceCrossCompactionWriter extends FastCrossCompactionWriter {
+public class InPlaceCrossCompactionWriter extends FastCrossCompactionWriter {
 
   boolean[] deviceExistButNotRewrite;
 
-  public FastDeviceCrossCompactionWriter(
+  public InPlaceCrossCompactionWriter(
       List<TsFileResource> targetResources,
       List<TsFileResource> seqSourceResources,
       Map<TsFileResource, TsFileSequenceReader> readerMap)

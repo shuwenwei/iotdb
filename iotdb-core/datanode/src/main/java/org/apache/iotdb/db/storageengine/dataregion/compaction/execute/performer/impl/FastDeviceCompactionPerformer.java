@@ -20,7 +20,6 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl;
 
 import org.apache.iotdb.commons.exception.IllegalPathException;
-import org.apache.iotdb.commons.path.PartialPath;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.exception.WriteProcessException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.IllegalCompactionTaskSummaryException;
@@ -31,12 +30,11 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subt
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.MultiTsFileDeviceIterator;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.writer.AbstractCompactionWriter;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.writer.FastDeviceCrossCompactionWriter;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.writer.InPlaceCrossCompactionWriter;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.io.CompactionTsFileReader;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.CompactionTaskManager;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.constant.CompactionType;
 import org.apache.iotdb.db.storageengine.dataregion.modification.Modification;
-import org.apache.iotdb.db.storageengine.dataregion.modification.ModificationFile;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.DeviceTimeIndex;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.FileTimeIndex;
@@ -102,8 +100,8 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
 
     try (MultiTsFileDeviceIterator deviceIterator =
         new MultiTsFileDeviceIterator(seqFiles, unseqFiles, readerCacheMap)) {
-      FastDeviceCrossCompactionWriter compactionWriter =
-          new FastDeviceCrossCompactionWriter(seqFiles, seqFiles, readerCacheMap);
+      InPlaceCrossCompactionWriter compactionWriter =
+          new InPlaceCrossCompactionWriter(seqFiles, seqFiles, readerCacheMap);
       while (deviceIterator.hasNextDevice()) {
         checkThreadInterrupt();
 
@@ -247,7 +245,7 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
   }
 
   private void copyDeviceChunkMetadata(
-      FastDeviceCrossCompactionWriter compactionWriter,
+      InPlaceCrossCompactionWriter compactionWriter,
       List<TsFileResource> resources,
       String device)
       throws IOException {
