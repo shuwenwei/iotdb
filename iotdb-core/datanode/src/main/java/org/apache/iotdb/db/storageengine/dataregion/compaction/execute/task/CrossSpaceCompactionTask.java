@@ -50,13 +50,13 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class CrossSpaceCompactionTask extends AbstractCompactionTask {
-  private static final Logger LOGGER =
+  protected static final Logger LOGGER =
       LoggerFactory.getLogger(IoTDBConstant.COMPACTION_LOGGER_NAME);
   protected List<TsFileResource> selectedSequenceFiles;
   protected List<TsFileResource> selectedUnsequenceFiles;
   protected TsFileResourceList seqTsFileResourceList;
   protected TsFileResourceList unseqTsFileResourceList;
-  private File logFile;
+  protected File logFile;
   protected List<TsFileResource> targetTsfileResourceList;
   protected List<TsFileResource> holdReadLockList = new ArrayList<>();
   protected List<TsFileResource> holdWriteLockList = new ArrayList<>();
@@ -297,7 +297,7 @@ public class CrossSpaceCompactionTask extends AbstractCompactionTask {
         && this.performer.getClass().isInstance(otherCrossCompactionTask.performer);
   }
 
-  private void releaseAllLocksAndResetStatus() {
+   protected void releaseAllLocksAndResetStatus() {
     resetCompactionCandidateStatusForAllSourceFiles();
     for (TsFileResource tsFileResource : holdReadLockList) {
       tsFileResource.readUnlock();
@@ -352,7 +352,7 @@ public class CrossSpaceCompactionTask extends AbstractCompactionTask {
     return equalsOtherTask((CrossSpaceCompactionTask) other);
   }
 
-  private void releaseReadAndLockWrite(List<TsFileResource> tsFileResourceList) {
+  protected void releaseReadAndLockWrite(List<TsFileResource> tsFileResourceList) {
     for (TsFileResource tsFileResource : tsFileResourceList) {
       tsFileResource.readUnlock();
       holdReadLockList.remove(tsFileResource);

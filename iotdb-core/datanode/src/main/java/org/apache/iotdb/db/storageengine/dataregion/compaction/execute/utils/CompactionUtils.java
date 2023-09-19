@@ -20,7 +20,10 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils;
 
 import org.apache.iotdb.commons.conf.IoTDBConstant;
+import org.apache.iotdb.commons.exception.IllegalPathException;
+import org.apache.iotdb.commons.path.PartialPath;
 import org.apache.iotdb.db.service.metrics.FileMetrics;
+import org.apache.iotdb.db.storageengine.dataregion.modification.Deletion;
 import org.apache.iotdb.db.storageengine.dataregion.modification.Modification;
 import org.apache.iotdb.db.storageengine.dataregion.modification.ModificationFile;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
@@ -56,6 +59,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -150,6 +154,44 @@ public class CompactionUtils {
         FileMetrics.getInstance().increaseModFileSize(targetResource.getModFile().getSize());
       }
       modifications.removeAll(seqModifications);
+    }
+  }
+
+  public static void combineModsInInplaceCrossCompaction(
+      List<TsFileResource> seqResources,
+      List<TsFileResource> unseqResources,
+      List<Long> dataSizeOfSeqFilesBeforeCompaction,
+      Map<TsFileResource, Set<String>> rewriteDeviceOfSeqFiles
+  ) throws IOException, IllegalPathException {
+    Set<Modification> modifications = new HashSet<>();
+    for (TsFileResource unseqFile : unseqResources) {
+      modifications.addAll(ModificationFile.getCompactionMods(unseqFile).getModifications());
+    }
+
+    for (int i = 0; i < seqResources.size(); i++) {
+      TsFileResource seqFile = seqResources.get(i);
+      Set<Modification> seqModifications =
+          new HashSet<>(ModificationFile.getCompactionMods(seqResources.get(i)).getModifications());
+      seqModifications.addAll(modifications);
+      Set<String> rewriteDevices = rewriteDeviceOfSeqFiles.getOrDefault(seqFile, Collections.emptySet());
+
+      try (ModificationFile modificationFile = ModificationFile.getNormalMods(seqFile)) {
+        for (Modification modification : seqModifications) {
+          // we have to set modification offset to MAX_VALUE, as the offset of source chunk may
+          // change after compaction
+          modification.setFileOffset(Long.MAX_VALUE);
+          modificationFile.write(modification);
+        }
+        for (String device : rewriteDevices) {
+          Deletion modification = new Deletion(new PartialPath(device), dataSizeOfSeqFilesBeforeCompaction.get(i), Long.MIN_VALUE, Long.MAX_VALUE);
+          modificationFile.write(modification);
+        }
+      }
+
+      if (!seqModifications.isEmpty() || !rewriteDevices.isEmpty()) {
+        FileMetrics.getInstance().increaseModFileNum(1);
+        FileMetrics.getInstance().increaseModFileSize(seqFile.getModFile().getSize());
+      }
     }
   }
 

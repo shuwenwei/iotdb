@@ -20,6 +20,7 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl;
 
 import org.apache.iotdb.commons.exception.IllegalPathException;
+import org.apache.iotdb.commons.path.PartialPath;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.exception.WriteProcessException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.IllegalCompactionTaskSummaryException;
@@ -35,6 +36,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.io.CompactionTsFi
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.CompactionTaskManager;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.constant.CompactionType;
 import org.apache.iotdb.db.storageengine.dataregion.modification.Modification;
+import org.apache.iotdb.db.storageengine.dataregion.modification.ModificationFile;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.DeviceTimeIndex;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.FileTimeIndex;
@@ -74,7 +76,7 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
   private static final int SUB_TASK_NUM =
       IoTDBDescriptor.getInstance().getConfig().getSubCompactionTaskNum();
   private Map<TsFileResource, List<Modification>> modificationCache = new ConcurrentHashMap<>();
-
+  private Map<TsFileResource, Set<String>> rewriteDevices;
   private Map<TsFileResource, DeviceTimeIndex> deviceTimeIndexMap;
   private Map<TsFileResource, TsFileSequenceReader> readerCacheMap;
 
@@ -82,6 +84,7 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
       List<TsFileResource> seqFiles, List<TsFileResource> unseqFiles) {
     this.seqFiles = seqFiles;
     this.unseqFiles = unseqFiles;
+    this.rewriteDevices = new HashMap<>();
     this.deviceTimeIndexMap = new HashMap<>();
     this.readerCacheMap = new HashMap<>();
   }
@@ -144,6 +147,11 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
           if (sortedSeqFilesOfCurrentDevice.size() != selectedSourceFiles.size()) {
             sortedSeqFilesOfCurrentDevice.removeAll(selectedSourceFiles);
             copyDeviceChunkMetadata(compactionWriter, sortedSeqFilesOfCurrentDevice, device);
+          }
+          for (TsFileResource selectedSourceFile : selectedSourceFiles) {
+            Set<String> rewriteDeviceOfCurrentFile = rewriteDevices.getOrDefault(selectedSourceFile, new HashSet<>());
+            rewriteDeviceOfCurrentFile.add(device);
+            rewriteDevices.put(selectedSourceFile, rewriteDeviceOfCurrentFile);
           }
           selectedSourceFiles.addAll(sortedUnseqFilesOfCurrentDevice);
           sortedSourceFiles = selectedSourceFiles.stream()
@@ -266,6 +274,9 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
 
       long startDispatchTime = Long.MIN_VALUE;
       for (TsFileResource sortedSeqFile : sortedSeqFiles) {
+        if (selectedSeqFiles.contains(sortedSeqFile)) {
+          continue;
+        }
         DeviceTimeIndex seqDeviceTimeIndex = deviceTimeIndexMap.get(sortedSeqFile);
         long endDispatchTime = seqDeviceTimeIndex.getEndTime(device);
 
@@ -423,5 +434,9 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
       deviceTimeIndexMap.put(resource, (DeviceTimeIndex) timeIndex);
       return (DeviceTimeIndex) timeIndex;
     }
+  }
+
+  public Map<TsFileResource, Set<String>> getRewriteDevices() {
+    return rewriteDevices;
   }
 }

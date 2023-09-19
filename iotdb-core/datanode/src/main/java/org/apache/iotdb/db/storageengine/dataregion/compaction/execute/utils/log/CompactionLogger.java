@@ -82,6 +82,10 @@ public class CompactionLogger implements AutoCloseable {
     logStream.flush();
   }
 
+  public void logFile(TsFileResource tsFile, long dataSize, String flag) {
+
+  }
+
   public static File[] findCompactionLogs(boolean isInnerSpace, String directory) {
     String compactionLogSuffix =
         isInnerSpace ? INNER_COMPACTION_LOG_NAME_SUFFIX : CROSS_COMPACTION_LOG_NAME_SUFFIX;
