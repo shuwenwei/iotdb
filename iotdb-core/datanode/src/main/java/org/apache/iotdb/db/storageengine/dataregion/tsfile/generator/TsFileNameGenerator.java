@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static org.apache.iotdb.commons.conf.IoTDBConstant.FILE_NAME_SEPARATOR;
 import static org.apache.iotdb.tsfile.common.constant.TsFileConstant.TSFILE_SUFFIX;
@@ -192,24 +193,37 @@ public class TsFileNameGenerator {
       List<TsFileResource> seqResources) throws IOException {
     List<TsFileResource> targetFileResources = new ArrayList<>();
     for (TsFileResource resource : seqResources) {
-      TsFileName tsFileName = getTsFileName(resource.getTsFile().getName());
-      tsFileName.setCrossCompactionCnt(tsFileName.getCrossCompactionCnt() + 1);
       // set target resource to COMPACTING until the end of this task
       targetFileResources.add(
-          new TsFileResource(
-              new File(
-                  resource.getTsFile().getParent(),
-                  tsFileName.time
-                      + FILE_NAME_SEPARATOR
-                      + tsFileName.version
-                      + FILE_NAME_SEPARATOR
-                      + tsFileName.innerCompactionCnt
-                      + FILE_NAME_SEPARATOR
-                      + tsFileName.crossCompactionCnt
-                      + IoTDBConstant.CROSS_COMPACTION_TMP_FILE_SUFFIX),
-              TsFileResourceStatus.COMPACTING));
+          new TsFileResource(getCrossSpaceCompactionTargetFile(resource, true), TsFileResourceStatus.COMPACTING));
     }
     return targetFileResources;
+  }
+
+  public static List<TsFileResource> getInPlaceCrossCompactionTargetFileResources(
+      List<TsFileResource> seqResources) throws IOException {
+    List<TsFileResource> targetFileResources = new ArrayList<>();
+    for (TsFileResource resource : seqResources) {
+      // generate a copy of source seq TsFileResource to avoid modify source TsFileResource in compaction
+      targetFileResources.add(new TsFileResource(resource.getTsFile(), TsFileResourceStatus.COMPACTING));
+    }
+    return targetFileResources;
+  }
+
+  public static File getCrossSpaceCompactionTargetFile(TsFileResource seqTsFileResource, boolean isTempFile) throws IOException {
+    TsFileName tsFileName = getTsFileName(seqTsFileResource.getTsFile().getName());
+    tsFileName.setCrossCompactionCnt(tsFileName.getCrossCompactionCnt() + 1);
+    return new File(
+            seqTsFileResource.getTsFile().getParent(),
+            tsFileName.time
+            + FILE_NAME_SEPARATOR
+            + tsFileName.version
+            + FILE_NAME_SEPARATOR
+            + tsFileName.innerCompactionCnt
+            + FILE_NAME_SEPARATOR
+            + tsFileName.crossCompactionCnt
+            + (isTempFile ? IoTDBConstant.CROSS_COMPACTION_TMP_FILE_SUFFIX : TSFILE_SUFFIX)
+        );
   }
 
   /**

@@ -30,6 +30,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
+import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
 import org.apache.iotdb.db.storageengine.rescon.memory.SystemInfo;
 import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
 import org.slf4j.Logger;
@@ -52,6 +53,7 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
   private List<InPlaceCompactionUnSeqFile> inPlaceCompactionUnSeqFiles;
   private List<TsFileResource> selectedSequenceFiles;
   private List<TsFileResource> selectedUnsequenceFiles;
+  private List<TsFileResource> targetFiles;
   private long memoryCost;
 
   public InplaceCrossSpaceCompactionTask(
@@ -72,6 +74,11 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
         serialId);
     this.selectedSequenceFiles = selectedSequenceFiles;
     this.selectedUnsequenceFiles = selectedUnsequenceFiles;
+    // generate a copy of all source seq TsFileResource in memory
+    this.targetFiles = selectedSequenceFiles
+        .stream()
+        .map(resource -> new TsFileResource(resource.getTsFile(), TsFileResourceStatus.COMPACTING))
+        .collect(Collectors.toList());
     this.memoryCost = memoryCost;
     this.performer = performer;
     this.inPlaceCompactionSeqFiles = selectedSequenceFiles
@@ -129,22 +136,25 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
       }
 
       performer.setSourceFiles(selectedSequenceFiles, selectedUnsequenceFiles);
-      performer.setTargetFiles(selectedSequenceFiles);
+      performer.setTargetFiles(targetFiles);
       performer.setSummary(summary);
       performer.perform();
 
+
+      replaceFileReferenceInTsFileResources(targetFiles);
       CompactionUtils.updateProgressIndex(
-          selectedSequenceFiles, selectedSequenceFiles, selectedUnsequenceFiles);
+          targetFiles, selectedSequenceFiles, selectedUnsequenceFiles);
       List<Long> dataSizeOfSourceSeqFiles =
           inPlaceCompactionSeqFiles
               .stream()
               .map(InPlaceCompactionSeqFile::getDataSize)
               .collect(Collectors.toList());
-      CompactionUtils.combineModsInInplaceCrossCompaction(
+      CompactionUtils.combineModsInInPlaceCrossCompaction(
           selectedSequenceFiles,
           selectedUnsequenceFiles,
           dataSizeOfSourceSeqFiles,
           ((FastDeviceCompactionPerformer) performer).getRewriteDevices());
+
 
     } catch (Exception e) {
       isSuccess = false;
@@ -181,6 +191,13 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
       f.releaseWriteLockAndReadLock();
     }
     return true;
+  }
+
+  private void replaceFileReferenceInTsFileResources(List<TsFileResource> targetFileResources) throws IOException {
+    for (TsFileResource resource : targetFileResources) {
+      File newTargetFile = TsFileNameGenerator.getCrossSpaceCompactionTargetFile(resource, false);
+      resource.setFile(newTargetFile);
+    }
   }
 
   private void recoverSeqFiles() {
@@ -399,21 +416,18 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
             updateTsFileResourceStatusToCompacting();
             releaseWriteLockAndReadLock();
           }
-
-          Files.delete(getMetadataFile().toPath());
-
         } catch (Exception e) {
-
+          // TODO
         }
-      } else {
-        // 删除 meta 文件 if exist
-        File metadataFile = getMetadataFile();
-        if (metadataFile.exists()) {
-          try {
-            Files.delete(metadataFile.toPath());
-          } catch (IOException e) {
-
-          }
+      }
+      // 删除 meta 文件 if exist
+      File metadataFile = getMetadataFile();
+      if (metadataFile.exists()) {
+        try {
+          Files.delete(metadataFile.toPath());
+        } catch (IOException e) {
+          // TODO
+          LOGGER.error("Failed to delete meta file {}", metadataFile.getAbsoluteFile());
         }
       }
     }

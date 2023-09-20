@@ -98,7 +98,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             tsFileManager,
             seqFiles,
             unseqFiles,
-            new FastDeviceCompactionPerformer(seqFiles, unseqFiles),
+            new FastDeviceCompactionPerformer(),
             new AtomicInteger(0),
             0,
             0);
@@ -179,7 +179,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             tsFileManager,
             seqFiles,
             unseqFiles,
-            new FastDeviceCompactionPerformer(seqFiles, unseqFiles),
+            new FastDeviceCompactionPerformer(),
             new AtomicInteger(0),
             0,
             0);

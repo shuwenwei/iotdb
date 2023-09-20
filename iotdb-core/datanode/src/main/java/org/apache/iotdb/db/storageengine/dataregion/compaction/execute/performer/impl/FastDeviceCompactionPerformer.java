@@ -70,6 +70,7 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
 
   private List<TsFileResource> seqFiles;
   private List<TsFileResource> unseqFiles;
+  private List<TsFileResource> targetFiles;
   private FastCompactionTaskSummary subTaskSummary;
   private static final int SUB_TASK_NUM =
       IoTDBDescriptor.getInstance().getConfig().getSubCompactionTaskNum();
@@ -78,10 +79,7 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
   private Map<TsFileResource, DeviceTimeIndex> deviceTimeIndexMap;
   private Map<TsFileResource, TsFileSequenceReader> readerCacheMap;
 
-  public FastDeviceCompactionPerformer(
-      List<TsFileResource> seqFiles, List<TsFileResource> unseqFiles) {
-    this.seqFiles = seqFiles;
-    this.unseqFiles = unseqFiles;
+  public FastDeviceCompactionPerformer() {
     this.rewriteDevices = new HashMap<>();
     this.deviceTimeIndexMap = new HashMap<>();
     this.readerCacheMap = new HashMap<>();
@@ -92,8 +90,6 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
     buildDeviceTimeIndexList(seqFiles);
     buildDeviceTimeIndexList(unseqFiles);
 
-    moveMetadataToTempFile(seqFiles);
-
     // todo: use special TsFileInput to generate readerCacheMap
 
     initReaderCacheMap();
@@ -101,7 +97,7 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
     try (MultiTsFileDeviceIterator deviceIterator =
         new MultiTsFileDeviceIterator(seqFiles, unseqFiles, readerCacheMap)) {
       InPlaceCrossCompactionWriter compactionWriter =
-          new InPlaceCrossCompactionWriter(seqFiles, seqFiles, readerCacheMap);
+          new InPlaceCrossCompactionWriter(targetFiles, seqFiles, readerCacheMap);
       while (deviceIterator.hasNextDevice()) {
         checkThreadInterrupt();
 
@@ -175,7 +171,7 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
         subTaskSummary.setTemporalFileSize(compactionWriter.getWriterSize());
       }
       compactionWriter.endFile();
-      CompactionUtils.updatePlanIndexes(Collections.emptyList(), seqFiles, unseqFiles);
+      CompactionUtils.updatePlanIndexes(targetFiles, seqFiles, unseqFiles);
     } catch (Exception e) {
       // todo
       e.printStackTrace();
@@ -397,7 +393,9 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
   }
 
   @Override
-  public void setTargetFiles(List<TsFileResource> targetFiles) {}
+  public void setTargetFiles(List<TsFileResource> targetFiles) {
+    this.targetFiles = targetFiles;
+  }
 
   @Override
   public void setSummary(CompactionTaskSummary summary) {

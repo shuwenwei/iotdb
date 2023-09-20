@@ -55,7 +55,7 @@ public class FastCrossCompactionWriter extends AbstractCrossCompactionWriter {
       Map<TsFileResource, TsFileSequenceReader> readerMap,
       boolean append)
       throws IOException {
-    super(seqResources, seqResources, append);
+    super(targetResources, seqResources, append);
     this.readerMap = readerMap;
   }
 

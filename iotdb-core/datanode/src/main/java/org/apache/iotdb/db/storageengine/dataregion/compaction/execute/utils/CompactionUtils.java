@@ -28,6 +28,7 @@ import org.apache.iotdb.db.storageengine.dataregion.modification.Modification;
 import org.apache.iotdb.db.storageengine.dataregion.modification.ModificationFile;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
+import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.DeviceTimeIndex;
 import org.apache.iotdb.tsfile.common.conf.TSFileConfig;
 import org.apache.iotdb.tsfile.common.conf.TSFileDescriptor;
@@ -157,7 +158,7 @@ public class CompactionUtils {
     }
   }
 
-  public static void combineModsInInplaceCrossCompaction(
+  public static void combineModsInInPlaceCrossCompaction(
       List<TsFileResource> seqResources,
       List<TsFileResource> unseqResources,
       List<Long> dataSizeOfSeqFilesBeforeCompaction,
@@ -176,7 +177,10 @@ public class CompactionUtils {
       Set<String> rewriteDevices =
           rewriteDeviceOfSeqFiles.getOrDefault(seqFile, Collections.emptySet());
 
-      try (ModificationFile modificationFile = ModificationFile.getNormalMods(seqFile)) {
+      String targetModificationFilePath =
+          TsFileNameGenerator.getCrossSpaceCompactionTargetFile(seqFile, false).getAbsolutePath()
+              + ModificationFile.FILE_SUFFIX;
+      try (ModificationFile modificationFile = new ModificationFile(targetModificationFilePath)) {
         for (Modification modification : seqModifications) {
           // we have to set modification offset to MAX_VALUE, as the offset of source chunk may
           // change after compaction
