@@ -20,6 +20,7 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task;
 
 import org.apache.iotdb.commons.conf.IoTDBConstant;
+import org.apache.iotdb.db.service.metrics.FileMetrics;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionFileCountExceededException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionMemoryNotEnoughException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICrossCompactionPerformer;
@@ -33,6 +34,7 @@ import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
 import org.apache.iotdb.db.storageengine.rescon.memory.SystemInfo;
 import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +44,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -75,20 +78,22 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     this.selectedSequenceFiles = selectedSequenceFiles;
     this.selectedUnsequenceFiles = selectedUnsequenceFiles;
     // generate a copy of all source seq TsFileResource in memory
-    this.targetFiles = selectedSequenceFiles
-        .stream()
-        .map(resource -> new TsFileResource(resource.getTsFile(), TsFileResourceStatus.COMPACTING))
-        .collect(Collectors.toList());
+    this.targetFiles =
+        selectedSequenceFiles.stream()
+            .map(
+                resource ->
+                    new TsFileResource(resource.getTsFile(), TsFileResourceStatus.COMPACTING))
+            .collect(Collectors.toList());
     this.memoryCost = memoryCost;
     this.performer = performer;
-    this.inPlaceCompactionSeqFiles = selectedSequenceFiles
-        .stream()
-        .map(InPlaceCompactionSeqFile::new)
-        .collect(Collectors.toList());
-    this.inPlaceCompactionUnSeqFiles = selectedUnsequenceFiles
-        .stream()
-        .map(InPlaceCompactionUnSeqFile::new)
-        .collect(Collectors.toList());
+    this.inPlaceCompactionSeqFiles =
+        selectedSequenceFiles.stream()
+            .map(InPlaceCompactionSeqFile::new)
+            .collect(Collectors.toList());
+    this.inPlaceCompactionUnSeqFiles =
+        selectedUnsequenceFiles.stream()
+            .map(InPlaceCompactionUnSeqFile::new)
+            .collect(Collectors.toList());
   }
 
   private void init() throws IOException {
@@ -99,7 +104,8 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
 
   @Override
   protected List<TsFileResource> getAllSourceTsFiles() {
-    List<TsFileResource> allSourceTsFiles = new ArrayList<>(selectedSequenceFiles.size() + selectedUnsequenceFiles.size());
+    List<TsFileResource> allSourceTsFiles =
+        new ArrayList<>(selectedSequenceFiles.size() + selectedUnsequenceFiles.size());
     allSourceTsFiles.addAll(selectedSequenceFiles);
     allSourceTsFiles.addAll(selectedUnsequenceFiles);
     return allSourceTsFiles;
@@ -119,7 +125,8 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     try (CompactionLogger logger = new CompactionLogger(logFile)) {
       init();
       for (InPlaceCompactionSeqFile f : this.inPlaceCompactionSeqFiles) {
-        logger.logFile(f.tsFileResource, CompactionLogger.STR_SOURCE_FILES, f.dataSize, f.metadataSize);
+        logger.logFile(
+            f.tsFileResource, CompactionLogger.STR_SOURCE_FILES, f.dataSize, f.metadataSize);
       }
       for (TsFileResource f : this.selectedUnsequenceFiles) {
         logger.logFile(f, CompactionLogger.STR_SOURCE_FILES);
@@ -140,13 +147,11 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
       performer.setSummary(summary);
       performer.perform();
 
-
-      replaceFileReferenceInTsFileResources(targetFiles);
       CompactionUtils.updateProgressIndex(
           targetFiles, selectedSequenceFiles, selectedUnsequenceFiles);
+      updateTargetTsFileResourceFiles(targetFiles);
       List<Long> dataSizeOfSourceSeqFiles =
-          inPlaceCompactionSeqFiles
-              .stream()
+          inPlaceCompactionSeqFiles.stream()
               .map(InPlaceCompactionSeqFile::getDataSize)
               .collect(Collectors.toList());
       CompactionUtils.combineModsInInPlaceCrossCompaction(
@@ -155,7 +160,33 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
           dataSizeOfSourceSeqFiles,
           ((FastDeviceCompactionPerformer) performer).getRewriteDevices());
 
+      releaseReadLockAndAcquireWriteLock(inPlaceCompactionSeqFiles);
+      renameSeqSourceFileToTargetFile();
+      tsFileManager.replace(
+          selectedSequenceFiles, selectedUnsequenceFiles, targetFiles, timePartition, true);
 
+      for (TsFileResource sequenceResource : selectedSequenceFiles) {
+        if (sequenceResource.getModFile().exists()) {
+          FileMetrics.getInstance().decreaseModFileNum(1);
+          FileMetrics.getInstance().decreaseModFileSize(sequenceResource.getModFile().getSize());
+        }
+      }
+
+      for (TsFileResource unsequenceResource : selectedUnsequenceFiles) {
+        if (unsequenceResource.getModFile().exists()) {
+          FileMetrics.getInstance().decreaseModFileNum(1);
+          FileMetrics.getInstance().decreaseModFileSize(unsequenceResource.getModFile().getSize());
+        }
+      }
+      CompactionUtils.deleteSourceTsFileAndUpdateFileMetrics(
+          Collections.emptyList(), selectedSequenceFiles);
+      CompactionUtils.deleteCompactionModsFile(selectedSequenceFiles, selectedUnsequenceFiles);
+      for (TsFileResource targetFile : targetFiles) {
+        targetFile.setStatus(TsFileResourceStatus.NORMAL);
+      }
+      // CompactionMetric update summry
+
+      // compaction status log
     } catch (Exception e) {
       isSuccess = false;
       recoverSeqFiles();
@@ -165,6 +196,14 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
           .decreaseCompactionFileNumCost(
               inPlaceCompactionSeqFiles.size() + selectedUnsequenceFiles.size());
       releaseAllLocksAndResetStatus();
+      if (logFile.exists()) {
+        try {
+          Files.delete(logFile.toPath());
+        } catch (IOException e) {
+          // TODO
+          LOGGER.error("Failed to delete log file");
+        }
+      }
     }
     return isSuccess;
   }
@@ -193,10 +232,21 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     return true;
   }
 
-  private void replaceFileReferenceInTsFileResources(List<TsFileResource> targetFileResources) throws IOException {
+  private void updateTargetTsFileResourceFiles(List<TsFileResource> targetFileResources)
+      throws IOException {
     for (TsFileResource resource : targetFileResources) {
       File newTargetFile = TsFileNameGenerator.getCrossSpaceCompactionTargetFile(resource, false);
       resource.setFile(newTargetFile);
+      resource.serialize();
+      resource.closeWithoutSettingStatus();
+    }
+  }
+
+  private void renameSeqSourceFileToTargetFile() throws IOException {
+    for (TsFileResource resource : selectedSequenceFiles) {
+      File sourceFile = resource.getTsFile();
+      File targetFile = TsFileNameGenerator.getCrossSpaceCompactionTargetFile(resource, false);
+      sourceFile.renameTo(targetFile);
     }
   }
 
@@ -211,7 +261,8 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     if (!(otherTask instanceof InplaceCrossSpaceCompactionTask)) {
       return false;
     }
-    InplaceCrossSpaceCompactionTask otherCrossCompactionTask = (InplaceCrossSpaceCompactionTask) otherTask;
+    InplaceCrossSpaceCompactionTask otherCrossCompactionTask =
+        (InplaceCrossSpaceCompactionTask) otherTask;
     return this.selectedSequenceFiles.equals(otherCrossCompactionTask.selectedSequenceFiles)
         && this.selectedUnsequenceFiles.equals(otherCrossCompactionTask.selectedUnsequenceFiles)
         && this.performer.getClass().isInstance(otherCrossCompactionTask.performer);
@@ -265,6 +316,17 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     } catch (Exception e) {
       releaseAllLocksAndResetStatus();
       throw e;
+    }
+    return true;
+  }
+
+  private boolean releaseReadLockAndAcquireWriteLock(List<? extends InPlaceCompactionFile> files) {
+    try {
+      for (InPlaceCompactionFile f : files) {
+        f.releaseReadLockAndWriteLock();
+      }
+    } catch (Exception e) {
+      return false;
     }
     return true;
   }
@@ -337,7 +399,6 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
       tsFileResource.readUnlock();
       lockStatus = LockStatus.NO_LOCK;
     }
-
   }
 
   private static class InPlaceCompactionUnSeqFile extends InPlaceCompactionFile {
@@ -345,7 +406,6 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     public InPlaceCompactionUnSeqFile(TsFileResource resource) {
       super(resource);
     }
-
   }
 
   private enum LockStatus {
@@ -473,7 +533,11 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
 
     public FileChannel getTsFileChannel() throws IOException {
       if (tsFileChannel == null) {
-        this.tsFileChannel = FileChannel.open(tsFileResource.getTsFile().toPath(), StandardOpenOption.READ, StandardOpenOption.APPEND);
+        this.tsFileChannel =
+            FileChannel.open(
+                tsFileResource.getTsFile().toPath(),
+                StandardOpenOption.READ,
+                StandardOpenOption.APPEND);
       }
       return this.tsFileChannel;
     }
@@ -481,7 +545,8 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     public FileChannel getMetaFileChannel() throws IOException {
       if (metaFileChannel == null) {
         File metaFile = getMetadataFile();
-        this.metaFileChannel = FileChannel.open(metaFile.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
+        this.metaFileChannel =
+            FileChannel.open(metaFile.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
       }
       return this.metaFileChannel;
     }

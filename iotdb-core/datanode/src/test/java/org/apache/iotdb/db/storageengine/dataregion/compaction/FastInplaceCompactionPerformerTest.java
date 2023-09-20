@@ -1,6 +1,7 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction;
 
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.FastDeviceCompactionPerformer;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.CompactionTaskManager;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.utils.CompactionTestFileWriter;
@@ -173,17 +174,17 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     unseqFiles.add(unseqResource3);
 
     CompactionTaskManager.getInstance().start();
-    CrossSpaceCompactionTask task =
-        new CrossSpaceCompactionTask(
-            0,
-            tsFileManager,
-            seqFiles,
-            unseqFiles,
-            new FastDeviceCompactionPerformer(),
-            new AtomicInteger(0),
-            0,
-            0);
-    task.start();
+//    AbstractCompactionTask task =
+//        new InplaceCrossSpaceCompactionTask(
+//            0,
+//            tsFileManager,
+//            seqFiles,
+//            unseqFiles,
+//            new FastDeviceCompactionPerformer(),
+//            new AtomicInteger(0),
+//            0,
+//            0);
+//    task.start();start
 
     System.out.println();
   }
