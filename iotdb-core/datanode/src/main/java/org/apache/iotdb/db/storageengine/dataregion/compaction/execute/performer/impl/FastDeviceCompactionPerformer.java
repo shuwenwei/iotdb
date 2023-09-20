@@ -227,7 +227,7 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
   private void initReaderCacheMap() throws IOException {
     for (TsFileResource resource : seqFiles) {
       File dataFile = resource.getTsFile();
-      File metadataFile = new File(dataFile.getAbsolutePath() + ".mt");
+      File metadataFile = new File(dataFile.getAbsolutePath() + ".tail");
 
       CompactingTsFileInput tsFileInput =
           new CompactingTsFileInput(dataFile.toPath(), metadataFile.toPath());

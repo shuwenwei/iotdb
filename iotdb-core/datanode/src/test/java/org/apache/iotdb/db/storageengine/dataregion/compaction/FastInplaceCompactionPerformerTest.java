@@ -3,9 +3,11 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.FastDeviceCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CrossSpaceCompactionTask;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InplaceCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.CompactionTaskManager;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.utils.CompactionTestFileWriter;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
+import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
 import org.apache.iotdb.tsfile.file.header.PageHeader;
 import org.apache.iotdb.tsfile.file.metadata.ChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.enums.CompressionType;
@@ -40,6 +42,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             TSEncoding.PLAIN,
             CompressionType.LZ4,
             true);
+    seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
     TsFileResource seqResource2 =
         generateSingleNonAlignedSeriesFile(
             "d1",
@@ -48,6 +51,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             TSEncoding.PLAIN,
             CompressionType.LZ4,
             true);
+    seqResource2.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
 
     TsFileResource seqResource3 =
         generateSingleNonAlignedSeriesFile(
@@ -57,6 +61,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             TSEncoding.PLAIN,
             CompressionType.LZ4,
             true);
+    seqResource3.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
 
     TsFileResource unseqResource1 =
         generateSingleNonAlignedSeriesFile(
@@ -66,6 +71,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             TSEncoding.PLAIN,
             CompressionType.LZ4,
             false);
+    unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
 
     TsFileResource unseqResource2 =
         generateSingleNonAlignedSeriesFile(
@@ -75,6 +81,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             TSEncoding.PLAIN,
             CompressionType.LZ4,
             false);
+    unseqResource2.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
 
     TsFileResource unseqResource3 =
         generateSingleNonAlignedSeriesFile(
@@ -84,6 +91,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             TSEncoding.PLAIN,
             CompressionType.LZ4,
             false);
+    unseqResource3.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
 
     seqFiles.add(seqResource1);
     seqFiles.add(seqResource2);
@@ -91,10 +99,12 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     unseqFiles.add(unseqResource1);
     unseqFiles.add(unseqResource2);
     unseqFiles.add(unseqResource3);
+    tsFileManager.addAll(seqFiles, true);
+    tsFileManager.addAll(unseqFiles, false);
 
     CompactionTaskManager.getInstance().start();
-    CrossSpaceCompactionTask task =
-        new CrossSpaceCompactionTask(
+    AbstractCompactionTask t =
+        new InplaceCrossSpaceCompactionTask(
             0,
             tsFileManager,
             seqFiles,
@@ -102,8 +112,10 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             new FastDeviceCompactionPerformer(),
             new AtomicInteger(0),
             0,
-            0);
-    task.start();
+            0
+        );
+    t.checkValidAndSetMerging();
+    t.start();
 
     System.out.println();
   }
@@ -174,17 +186,17 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     unseqFiles.add(unseqResource3);
 
     CompactionTaskManager.getInstance().start();
-//    AbstractCompactionTask task =
-//        new InplaceCrossSpaceCompactionTask(
-//            0,
-//            tsFileManager,
-//            seqFiles,
-//            unseqFiles,
-//            new FastDeviceCompactionPerformer(),
-//            new AtomicInteger(0),
-//            0,
-//            0);
-//    task.start();start
+    //    AbstractCompactionTask task =
+    //        new InplaceCrossSpaceCompactionTask(
+    //            0,
+    //            tsFileManager,
+    //            seqFiles,
+    //            unseqFiles,
+    //            new FastDeviceCompactionPerformer(),
+    //            new AtomicInteger(0),
+    //            0,
+    //            0);
+    //    task.start();start
 
     System.out.println();
   }

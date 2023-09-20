@@ -94,6 +94,7 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
         selectedUnsequenceFiles.stream()
             .map(InPlaceCompactionUnSeqFile::new)
             .collect(Collectors.toList());
+    this.summary = new FastCompactionTaskSummary();
   }
 
   private void init() throws IOException {
@@ -464,6 +465,7 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
           FileChannel tsFileChannel = getTsFileChannel();
           FileChannel metaFileChannel = getMetaFileChannel();
           tsFileChannel.truncate(dataSize);
+          tsFileChannel.position(dataSize);
           long transferSize = metaFileChannel.transferTo(0, metadataSize, tsFileChannel);
           if (transferSize != metadataSize) {
             throw new RuntimeException("Failed to recover TsFile");
@@ -528,7 +530,7 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
 
     public File getMetadataFile() {
       File dataFile = this.tsFileResource.getTsFile();
-      return new File(dataFile.getAbsolutePath() + ".meta");
+      return new File(dataFile.getAbsolutePath() + ".tail");
     }
 
     public FileChannel getTsFileChannel() throws IOException {
@@ -537,7 +539,7 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
             FileChannel.open(
                 tsFileResource.getTsFile().toPath(),
                 StandardOpenOption.READ,
-                StandardOpenOption.APPEND);
+                StandardOpenOption.WRITE);
       }
       return this.tsFileChannel;
     }
