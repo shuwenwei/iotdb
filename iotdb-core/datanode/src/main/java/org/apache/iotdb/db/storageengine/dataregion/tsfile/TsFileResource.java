@@ -695,7 +695,8 @@ public class TsFileResource {
                 TsFileResourceStatus.COMPACTION_CANDIDATE, TsFileResourceStatus.DELETED);
       case COMPACTING:
         return compareAndSetStatus(
-            TsFileResourceStatus.COMPACTION_CANDIDATE, TsFileResourceStatus.COMPACTING);
+            TsFileResourceStatus.COMPACTION_CANDIDATE, TsFileResourceStatus.COMPACTING)
+            || compareAndSetStatus(TsFileResourceStatus.SPLIT_DURING_COMPACTING, TsFileResourceStatus.COMPACTING);
       case SPLIT_DURING_COMPACTING:
         return compareAndSetStatus(
             TsFileResourceStatus.COMPACTING, TsFileResourceStatus.SPLIT_DURING_COMPACTING);
