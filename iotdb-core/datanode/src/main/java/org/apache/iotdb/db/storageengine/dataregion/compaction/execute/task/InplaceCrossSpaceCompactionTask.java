@@ -78,12 +78,13 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     this.selectedSequenceFiles = selectedSequenceFiles;
     this.selectedUnsequenceFiles = selectedUnsequenceFiles;
     // generate a copy of all source seq TsFileResource in memory
-    this.targetFiles =
-        selectedSequenceFiles.stream()
-            .map(
-                resource ->
-                    new TsFileResource(resource.getTsFile(), TsFileResourceStatus.COMPACTING))
-            .collect(Collectors.toList());
+    this.targetFiles = new ArrayList<>(selectedSequenceFiles.size());
+    for (TsFileResource seqFile : selectedSequenceFiles) {
+      TsFileResource targetFileResource =
+          new TsFileResource(seqFile.getTsFile(), TsFileResourceStatus.COMPACTING);
+      targetFileResource.writeLock();
+      targetFiles.add(targetFileResource);
+    }
     this.memoryCost = memoryCost;
     this.performer = performer;
     this.inPlaceCompactionSeqFiles =
@@ -161,10 +162,10 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
           dataSizeOfSourceSeqFiles,
           ((FastDeviceCompactionPerformer) performer).getRewriteDevices());
 
-      releaseReadLockAndAcquireWriteLock(inPlaceCompactionSeqFiles);
-      renameSeqSourceFileToTargetFile();
       tsFileManager.replace(
           selectedSequenceFiles, selectedUnsequenceFiles, targetFiles, timePartition, true);
+      releaseReadLockAndAcquireWriteLock(inPlaceCompactionSeqFiles);
+      renameSeqSourceFileToTargetFile();
 
       for (TsFileResource sequenceResource : selectedSequenceFiles) {
         if (sequenceResource.getModFile().exists()) {
@@ -179,8 +180,9 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
           FileMetrics.getInstance().decreaseModFileSize(unsequenceResource.getModFile().getSize());
         }
       }
+
       CompactionUtils.deleteSourceTsFileAndUpdateFileMetrics(
-          Collections.emptyList(), selectedSequenceFiles);
+          Collections.emptyList(), selectedUnsequenceFiles);
       CompactionUtils.deleteCompactionModsFile(selectedSequenceFiles, selectedUnsequenceFiles);
       for (TsFileResource targetFile : targetFiles) {
         targetFile.setStatus(TsFileResourceStatus.NORMAL);
