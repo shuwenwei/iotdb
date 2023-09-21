@@ -20,6 +20,7 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task;
 
 import org.apache.iotdb.commons.conf.IoTDBConstant;
+import org.apache.iotdb.commons.exception.IllegalPathException;
 import org.apache.iotdb.db.service.metrics.FileMetrics;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionFileCountExceededException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionMemoryNotEnoughException;
@@ -149,43 +150,18 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
       performer.setSummary(summary);
       performer.perform();
 
-      CompactionUtils.updateProgressIndex(
-          targetFiles, selectedSequenceFiles, selectedUnsequenceFiles);
-      updateTargetTsFileResourceFiles(targetFiles);
-      List<Long> dataSizeOfSourceSeqFiles =
-          inPlaceCompactionSeqFiles.stream()
-              .map(InPlaceCompactionSeqFile::getDataSize)
-              .collect(Collectors.toList());
-      CompactionUtils.combineModsInInPlaceCrossCompaction(
-          selectedSequenceFiles,
-          selectedUnsequenceFiles,
-          dataSizeOfSourceSeqFiles,
-          ((FastDeviceCompactionPerformer) performer).getRewriteDevices());
+      // prepare .resource, .mods files of target resources
+      prepareAdjuvantFilesOfTargetResources();
 
+      // acquired write lock of target resource when create it
       tsFileManager.replace(
           selectedSequenceFiles, selectedUnsequenceFiles, targetFiles, timePartition, true);
       releaseReadLockAndAcquireWriteLock(inPlaceCompactionSeqFiles);
       renameSeqSourceFileToTargetFile();
-
-      for (TsFileResource sequenceResource : selectedSequenceFiles) {
-        if (sequenceResource.getModFile().exists()) {
-          FileMetrics.getInstance().decreaseModFileNum(1);
-          FileMetrics.getInstance().decreaseModFileSize(sequenceResource.getModFile().getSize());
-        }
-      }
-
-      for (TsFileResource unsequenceResource : selectedUnsequenceFiles) {
-        if (unsequenceResource.getModFile().exists()) {
-          FileMetrics.getInstance().decreaseModFileNum(1);
-          FileMetrics.getInstance().decreaseModFileSize(unsequenceResource.getModFile().getSize());
-        }
-      }
-
-      CompactionUtils.deleteSourceTsFileAndUpdateFileMetrics(
-          Collections.emptyList(), selectedUnsequenceFiles);
-      CompactionUtils.deleteCompactionModsFile(selectedSequenceFiles, selectedUnsequenceFiles);
+      removeRemainingSourceFiles();
       for (TsFileResource targetFile : targetFiles) {
         targetFile.setStatus(TsFileResourceStatus.NORMAL);
+        targetFile.writeUnlock();
       }
       // CompactionMetric update summry
 
@@ -235,6 +211,21 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     return true;
   }
 
+  private void prepareAdjuvantFilesOfTargetResources() throws IOException, IllegalPathException {
+    CompactionUtils.updateProgressIndex(
+        targetFiles, selectedSequenceFiles, selectedUnsequenceFiles);
+    updateTargetTsFileResourceFiles(targetFiles);
+    List<Long> dataSizeOfSourceSeqFiles =
+        inPlaceCompactionSeqFiles.stream()
+            .map(InPlaceCompactionSeqFile::getDataSize)
+            .collect(Collectors.toList());
+    CompactionUtils.combineModsInInPlaceCrossCompaction(
+        selectedSequenceFiles,
+        selectedUnsequenceFiles,
+        dataSizeOfSourceSeqFiles,
+        ((FastDeviceCompactionPerformer) performer).getRewriteDevices());
+  }
+
   private void updateTargetTsFileResourceFiles(List<TsFileResource> targetFileResources)
       throws IOException {
     for (TsFileResource resource : targetFileResources) {
@@ -249,7 +240,7 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     for (TsFileResource resource : selectedSequenceFiles) {
       File sourceFile = resource.getTsFile();
       File targetFile = TsFileNameGenerator.getCrossSpaceCompactionTargetFile(resource, false);
-      sourceFile.renameTo(targetFile);
+      Files.move(sourceFile.toPath(), targetFile.toPath());
     }
   }
 
@@ -257,6 +248,25 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     for (InPlaceCompactionSeqFile f : this.inPlaceCompactionSeqFiles) {
       f.recover();
     }
+  }
+
+  private void removeRemainingSourceFiles() throws IOException {
+    for (TsFileResource sequenceResource : selectedSequenceFiles) {
+      if (sequenceResource.getModFile().exists()) {
+        FileMetrics.getInstance().decreaseModFileNum(1);
+        FileMetrics.getInstance().decreaseModFileSize(sequenceResource.getModFile().getSize());
+      }
+    }
+
+    for (TsFileResource unsequenceResource : selectedUnsequenceFiles) {
+      if (unsequenceResource.getModFile().exists()) {
+        FileMetrics.getInstance().decreaseModFileNum(1);
+        FileMetrics.getInstance().decreaseModFileSize(unsequenceResource.getModFile().getSize());
+      }
+    }
+    CompactionUtils.deleteSourceTsFileAndUpdateFileMetrics(
+        Collections.emptyList(), selectedUnsequenceFiles);
+    CompactionUtils.deleteCompactionModsFile(selectedSequenceFiles, selectedUnsequenceFiles);
   }
 
   @Override
