@@ -164,7 +164,6 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
         targetFile.setStatus(TsFileResourceStatus.NORMAL);
         targetFile.writeUnlock();
       }
-      // CompactionMetric update summry
 
       CompactionMetrics.getInstance().recordSummaryInfo(summary);
 

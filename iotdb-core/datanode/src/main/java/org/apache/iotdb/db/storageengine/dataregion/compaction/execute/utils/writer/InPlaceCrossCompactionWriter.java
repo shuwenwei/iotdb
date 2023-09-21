@@ -63,6 +63,7 @@ public class InPlaceCrossCompactionWriter extends FastCrossCompactionWriter {
       if (deviceExistButNotRewrite[i]) {
         CompactionUtils.updateResource(targetResources.get(i), targetFileWriters.get(i), deviceId);
         targetFileWriters.get(i).endChunkGroup();
+        deviceExistButNotRewrite[i] = false;
       }
     }
   }
