@@ -85,9 +85,19 @@ public class CompactionLogger implements AutoCloseable {
   }
 
   public void logFile(TsFileResource tsFile, String flag, long dataSize, long metaSize)
-      throws IOException {}
-
-  public void logFile(TsFileResource tsFile, long dataSize, String flag) {}
+      throws IOException {
+    logStream.write(
+        flag
+        + TsFileIdentifier.INFO_SEPARATOR
+        + TsFileIdentifier.getFileIdentifierFromFilePath(tsFile.getTsFile().getAbsolutePath()).toString()
+        + TsFileIdentifier.INFO_SEPARATOR
+        + dataSize
+        + TsFileIdentifier.INFO_SEPARATOR
+        + metaSize
+    );
+    logStream.newLine();
+    logStream.flush();
+  }
 
   public static File[] findCompactionLogs(boolean isInnerSpace, String directory) {
     String compactionLogSuffix =

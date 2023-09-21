@@ -21,6 +21,7 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task;
 
 import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.commons.exception.IllegalPathException;
+import org.apache.iotdb.db.service.metrics.CompactionMetrics;
 import org.apache.iotdb.db.service.metrics.FileMetrics;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionFileCountExceededException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionMemoryNotEnoughException;
@@ -164,6 +165,8 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
         targetFile.writeUnlock();
       }
       // CompactionMetric update summry
+
+      CompactionMetrics.getInstance().recordSummaryInfo(summary);
 
       // compaction status log
     } catch (Exception e) {
