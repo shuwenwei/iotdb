@@ -257,6 +257,54 @@ public class TsFileManager {
     }
   }
 
+  /** This method is called after compaction to update memory. */
+  public void replaceForInPlaceCrossSpaceCompaction(
+      List<TsFileResource> seqFileResources,
+      List<TsFileResource> unseqFileResources,
+      List<TsFileResource> targetFileResources,
+      long timePartition)
+      throws IOException {
+    List<TsFileResource> addedTargetFileResources = new ArrayList<>(targetFileResources.size());
+    List<TsFileResource> removedSeqFileResources = new ArrayList<>(seqFileResources.size());
+    List<TsFileResource> removedUnSeqFileResources = new ArrayList<>(unseqFileResources.size());
+    try {
+      for (TsFileResource tsFileResource : seqFileResources) {
+        if (sequenceFiles.get(timePartition).remove(tsFileResource)) {
+          removedSeqFileResources.add(tsFileResource);
+          TsFileResourceManager.getInstance().removeTsFileResource(tsFileResource);
+        }
+      }
+      for (TsFileResource tsFileResource : unseqFileResources) {
+        if (unsequenceFiles.get(timePartition).remove(tsFileResource)) {
+          removedUnSeqFileResources.add(tsFileResource);
+          TsFileResourceManager.getInstance().removeTsFileResource(tsFileResource);
+        }
+      }
+      for (TsFileResource resource : targetFileResources) {
+        if (!resource.isDeleted()) {
+          TsFileResourceManager.getInstance().registerSealedTsFileResource(resource);
+          sequenceFiles.get(timePartition).keepOrderInsert(resource);
+          addedTargetFileResources.add(resource);
+        }
+      }
+    } catch (Exception e) {
+      // undo replace
+      for (TsFileResource resource : addedTargetFileResources) {
+        if (sequenceFiles.get(timePartition).remove(resource)) {
+          TsFileResourceManager.getInstance().removeTsFileResource(resource);
+        }
+      }
+      for (TsFileResource resource : removedSeqFileResources) {
+        TsFileResourceManager.getInstance().registerSealedTsFileResource(resource);
+        sequenceFiles.get(timePartition).keepOrderInsert(resource);
+      }
+      for (TsFileResource resource : removedUnSeqFileResources) {
+        TsFileResourceManager.getInstance().registerSealedTsFileResource(resource);
+        sequenceFiles.get(timePartition).keepOrderInsert(resource);
+      }
+    }
+  }
+
   public boolean contains(TsFileResource tsFileResource, boolean sequence) {
     readLock();
     try {
