@@ -96,6 +96,7 @@ public class ModificationFile implements AutoCloseable {
   public void write(Modification mod) throws IOException {
     synchronized (this) {
       if (needVerify && new File(filePath).exists()) {
+
         writer.mayTruncateLastLine();
         needVerify = false;
       }

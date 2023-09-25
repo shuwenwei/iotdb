@@ -88,13 +88,13 @@ public class CompactionLogger implements AutoCloseable {
       throws IOException {
     logStream.write(
         flag
-        + TsFileIdentifier.INFO_SEPARATOR
-        + TsFileIdentifier.getFileIdentifierFromFilePath(tsFile.getTsFile().getAbsolutePath()).toString()
-        + TsFileIdentifier.INFO_SEPARATOR
-        + dataSize
-        + TsFileIdentifier.INFO_SEPARATOR
-        + metaSize
-    );
+            + TsFileIdentifier.INFO_SEPARATOR
+            + TsFileIdentifier.getFileIdentifierFromFilePath(tsFile.getTsFile().getAbsolutePath())
+                .toString()
+            + TsFileIdentifier.INFO_SEPARATOR
+            + dataSize
+            + TsFileIdentifier.INFO_SEPARATOR
+            + metaSize);
     logStream.newLine();
     logStream.flush();
   }

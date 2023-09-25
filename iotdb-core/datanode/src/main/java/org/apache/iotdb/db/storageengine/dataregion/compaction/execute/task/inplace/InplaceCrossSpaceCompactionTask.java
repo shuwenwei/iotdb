@@ -17,15 +17,18 @@
  * under the License.
  */
 
-package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task;
+package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace;
 
 import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.db.service.metrics.CompactionMetrics;
 import org.apache.iotdb.db.service.metrics.FileMetrics;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionFileCountExceededException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionMemoryNotEnoughException;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.InPlaceCompactionCleanupException;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.InPlaceCompactionErrorException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICrossCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.FastDeviceCompactionPerformer;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.FastCompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.CompactionLogger;
@@ -36,18 +39,14 @@ import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
 import org.apache.iotdb.db.storageengine.rescon.memory.SystemInfo;
 import org.apache.iotdb.db.storageengine.rescon.memory.TsFileResourceManager;
-import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -84,10 +83,12 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     this.selectedSequenceFiles = selectedSequenceFiles;
     this.selectedUnsequenceFiles = selectedUnsequenceFiles;
     // generate a copy of all source seq TsFileResource in memory
-    this.targetFiles = selectedSequenceFiles
-        .stream()
-        .map(resource -> new TsFileResource(resource.getTsFile(), TsFileResourceStatus.COMPACTING))
-        .collect(Collectors.toList());
+    this.targetFiles =
+        selectedSequenceFiles.stream()
+            .map(
+                resource ->
+                    new TsFileResource(resource.getTsFile(), TsFileResourceStatus.COMPACTING))
+            .collect(Collectors.toList());
     this.memoryCost = memoryCost;
     this.performer = performer;
     this.inPlaceCompactionSeqFiles =
@@ -103,7 +104,7 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
 
   private void initSeqFileInfo() throws IOException {
     for (InPlaceCompactionSeqFile inPlaceCompactionFile : inPlaceCompactionSeqFiles) {
-      inPlaceCompactionFile.prepare();
+      inPlaceCompactionFile.analyzeFile();
     }
   }
 
@@ -125,107 +126,97 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
                 + CompactionLogger.IN_PLACE_CROSS_COMPACTION_LOG_NAME_SUFFIX);
     boolean isSuccess = true;
     try (CompactionLogger logger = new CompactionLogger(logFile)) {
-      if(!prepareFileInfoAndTempFilesForPerform(logger)) {
-        isSuccess = false;
-        return false;
-      }
-      if (!performInPlaceCompaction()) {
-        isSuccess = false;
-        return false;
-      }
-      if (!prepareAdjuvantFilesOfTargetResources()) {
-        isSuccess = false;
-        return false;
-      }
+
+      initSeqFileInfo();
+      recordLogBeforeDoingCompaction(logger);
+
+      // 这个步骤如果发生了异常，需要进行文件恢复的内容包括：1. seqFile;
+      splitAllSeqFilesIntoDataAndMeta();
+
+      // 这个步骤如果发生了异常，需要进行文件恢复的内容包括：1. seqFile; 2. target resource, 3. mods ?
+      performInPlaceCompaction();
+
+      // 这个步骤如果发生了异常，需要进行文件恢复的内容包括：1. seqFile; 2. target resource, 3. 新产生的 mods、resource
+      prepareAdjuvantFilesOfTargetResources();
+
       // TODO modify current CompactionValidator to support InPlaceCompaction validation
 
+      atomicReplace();
 
-      if (!atomicReplace()) {
-        isSuccess = false;
-        return false;
-      }
+      // >>> 删除已经用完的源文件及其附属文件，顺序文件已经被重命名，不需要执行删除
       removeRemainingSourceFiles();
+      // <<< 删除已经用完的源文件及其附属文件
       CompactionMetrics.getInstance().recordSummaryInfo(summary);
-    } catch (Exception e) {
-      LOGGER.error("");
-      tsFileManager.setAllowCompaction(false);
+      return true;
+    } catch (InPlaceCompactionErrorException | IOException e) {
+      LOGGER.error("In place compaction error. Set AllCompaction to false.", e);
+      tsFileManager.setAllowCompaction(false); // 考虑是否需要在这一步进行设定？
+      LOGGER.info("start to execute failover for inplace compaction", e);
+      revertCompactionAndRecoverToInitStatus();
+      return false;
+    } catch (InPlaceCompactionCleanupException e) {
+      tsFileManager.setAllowCompaction(false); // 考虑是否需要在这一步进行设定？
+      LOGGER.error("fetal error. InPlaceCompaction error when doing cleanup work", e);
+      return false;
     } finally {
-      if (!isSuccess) {
-        recoverSeqFiles();
-        removeTempFilesWhenCompactionFailed();
-        removeTargetResourceAndModsFiles();
-      }
+      // >>> 系统资源释放
       SystemInfo.getInstance().resetCompactionMemoryCost(memoryCost);
       SystemInfo.getInstance()
           .decreaseCompactionFileNumCost(
               inPlaceCompactionSeqFiles.size() + selectedUnsequenceFiles.size());
+      // <<< 系统资源释放
 
-      releaseAllLocksAndResetStatus();
-      for (InPlaceCompactionSeqFile seqFile : inPlaceCompactionSeqFiles) {
-        try {
-          seqFile.close();
-        } catch (IOException e) {
-          LOGGER.error("failed to close seq file {}", seqFile.getTsFileResource());
-        }
+      // >>> 重置原始文件
+      for (InPlaceCompactionFile f : this.inPlaceCompactionSeqFiles) {
+        f.releaseResourceAndResetStatus();
       }
-      for (TsFileResource unseqFile : selectedUnsequenceFiles) {
-        try {
-          unseqFile.close();
-        } catch (IOException e) {
-          LOGGER.error("failed to close unseq file {}", unseqFile);
-        }
+      for (InPlaceCompactionFile f : this.inPlaceCompactionUnSeqFiles) {
+        f.releaseResourceAndResetStatus();
       }
+      // <<< 重置原始文件
     }
-    return true;
   }
 
-  private boolean prepareFileInfoAndTempFilesForPerform(CompactionLogger logger) {
-    // prepare infos and temp files to perform compaction
+  private void recordLogBeforeDoingCompaction(CompactionLogger logger) throws InPlaceCompactionErrorException {
     try {
-      // get data size and metadata size of source seq files
-      initSeqFileInfo();
       // record seq files in log
       for (InPlaceCompactionSeqFile f : this.inPlaceCompactionSeqFiles) {
         logger.logFile(
-            f.tsFileResource, CompactionLogger.STR_SOURCE_FILES, f.dataSize, f.metadataSize);
+            f.tsFileResource,
+            CompactionLogger.STR_SOURCE_FILES,
+            f.getDataSize(),
+            f.getMetadataSize());
       }
       // record unseq files in log
       for (InPlaceCompactionFile f : this.inPlaceCompactionUnSeqFiles) {
         logger.logFile(f.getTsFileResource(), CompactionLogger.STR_SOURCE_FILES);
       }
     } catch (IOException e) {
-      LOGGER.error("Failed to prepare file info");
-      return false;
+      throw new InPlaceCompactionErrorException("error when recording log before compaction", e);
     }
-    // prepare files to perform InPlaceCompaction
-    if (!prepareBeforePerform()) {
-      recoverSeqFiles();
-      return false;
-    }
-    return true;
   }
 
-  private boolean performInPlaceCompaction() {
+  private void performInPlaceCompaction() throws InPlaceCompactionErrorException {
     try {
       performer.setSourceFiles(selectedSequenceFiles, selectedUnsequenceFiles);
       performer.setTargetFiles(targetFiles);
       performer.setSummary(summary);
       performer.perform();
     } catch (Exception e) {
-      recoverSeqFiles();
-      return false;
+      throw new InPlaceCompactionErrorException("error when performing in place compaction.", e);
     }
-    return true;
   }
 
-  private boolean atomicReplace() {
+  private void atomicReplace() throws InPlaceCompactionCleanupException {
     List<TsFileResource> removedSeqFiles = new ArrayList<>(selectedSequenceFiles.size());
     List<TsFileResource> removedUnSeqFiles = new ArrayList<>(selectedUnsequenceFiles.size());
     List<TsFileResource> addedTargetFiles = new ArrayList<>(targetFiles.size());
     Map<Path, Path> renamedFileMap = new HashMap<>(selectedSequenceFiles.size());
 
-    TsFileResourceList seqListReference = tsFileManager.getOrCreateSequenceListByTimePartition(timePartition);
-    TsFileResourceList unSeqListReference = tsFileManager.getOrCreateSequenceListByTimePartition(timePartition);
+    TsFileResourceList seqListReference =
+        tsFileManager.getOrCreateSequenceListByTimePartition(timePartition);
+    TsFileResourceList unSeqListReference =
+        tsFileManager.getOrCreateSequenceListByTimePartition(timePartition);
     tsFileManager.writeLock("InPlaceCompaction");
     try {
       for (TsFileResource resource : selectedSequenceFiles) {
@@ -256,7 +247,8 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
       for (int i = 0; i < selectedSequenceFiles.size(); i++) {
         TsFileResource resource = selectedSequenceFiles.get(i);
         Path sourceFilePath = resource.getTsFile().toPath();
-        Path targetFilePath = TsFileNameGenerator.getCrossSpaceCompactionTargetFile(resource, false).toPath();
+        Path targetFilePath =
+            TsFileNameGenerator.getCrossSpaceCompactionTargetFile(resource, false).toPath();
         Files.move(sourceFilePath, targetFilePath);
         renamedFileMap.put(sourceFilePath, targetFilePath);
       }
@@ -292,38 +284,19 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
       } catch (IOException recoverException) {
         LOGGER.error("Failed to recover rename");
       }
-      return false;
+      throw new InPlaceCompactionCleanupException("error when replace target files atomically", e);
     } finally {
       tsFileManager.writeUnlock();
     }
-    return true;
   }
 
-  private boolean prepareBeforePerform() {
+  private void splitAllSeqFilesIntoDataAndMeta() throws InPlaceCompactionErrorException {
     for (InPlaceCompactionSeqFile f : this.inPlaceCompactionSeqFiles) {
-      // 1. generate tmp meta file
-      if (!f.writeMetadataToMetaFile()) {
-        return false;
-      }
-      // 2. release read lock and acquire write lock
-      f.releaseReadLockAndWriteLock();
-
-      // 3. change TsFileResource status
-      if (!f.updateTsFileResourceStatusToSplit()) {
-        return false;
-      }
-
-      // 4. truncate source file
-      if (!f.truncateSourceFile()) {
-        return false;
-      }
-      // 5. release write lock and acquire read lock
-      f.releaseWriteLockAndReadLock();
+      f.splitFileIntoDataAndMeta();
     }
-    return true;
   }
 
-  private boolean prepareAdjuvantFilesOfTargetResources() {
+  private void prepareAdjuvantFilesOfTargetResources() throws InPlaceCompactionErrorException {
     try {
       CompactionUtils.updateProgressIndex(
           targetFiles, selectedSequenceFiles, selectedUnsequenceFiles);
@@ -338,11 +311,8 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
           dataSizeOfSourceSeqFiles,
           ((FastDeviceCompactionPerformer) performer).getRewriteDevices());
     } catch (Exception e) {
-      LOGGER.error("Can not prepare resource and mods file for target TsFileResource");
-      removeTargetResourceAndModsFiles();
-      return false;
+      throw new InPlaceCompactionErrorException("Can not prepare resource and mods file for target TsFileResource", e);
     }
-    return true;
   }
 
   private void updateTargetTsFileResourceFiles(List<TsFileResource> targetFileResources)
@@ -355,13 +325,26 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     }
   }
 
-  private void recoverSeqFiles() {
-    for (InPlaceCompactionSeqFile f : this.inPlaceCompactionSeqFiles) {
-      f.recover();
+  public void revertCompactionAndRecoverToInitStatus() {
+    try {
+      revertSourceFiles();
+      removeTargetResourceAndModsFiles();
+    } catch (InPlaceCompactionErrorException e) {
+      tsFileManager.setAllowCompaction(false);
+      LOGGER.error("fetal error. recover InPlaceCompactionTask failed. Please recover it manually", e);
     }
   }
 
-  private void removeRemainingSourceFiles() {
+  private void revertSourceFiles() throws InPlaceCompactionErrorException {
+    for (InPlaceCompactionFile f : this.inPlaceCompactionSeqFiles) {
+      f.revert();
+    }
+    for (InPlaceCompactionFile f : this.inPlaceCompactionUnSeqFiles) {
+      f.revert();
+    }
+  }
+
+  private void removeRemainingSourceFiles() throws InPlaceCompactionCleanupException {
     try {
       for (TsFileResource sequenceResource : selectedSequenceFiles) {
         if (sequenceResource.getModFile().exists()) {
@@ -383,11 +366,11 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
           selectedSequenceFiles, selectedUnsequenceFiles);
       CompactionUtils.deleteCompactionModsFile(selectedSequenceFiles, selectedUnsequenceFiles);
     } catch (Exception e) {
-      LOGGER.error("Failed to remove remaining source files");
+      throw new InPlaceCompactionCleanupException("failed to remove remaining source files", e);
     }
   }
 
-  private void removeTargetResourceAndModsFiles() {
+  private void removeTargetResourceAndModsFiles() throws InPlaceCompactionErrorException {
     try {
       for (TsFileResource seqFile : selectedSequenceFiles) {
         File targetTsFile = TsFileNameGenerator.getCrossSpaceCompactionTargetFile(seqFile, false);
@@ -402,29 +385,7 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
         }
       }
     } catch (IOException e) {
-      LOGGER.error("Failed to remove target resource and mods files");
-    }
-  }
-
-  private void removeTempFilesWhenCompactionFailed() {
-    List<InPlaceCompactionFile> sourceFiles = new ArrayList<>(inPlaceCompactionSeqFiles.size() + inPlaceCompactionUnSeqFiles.size());
-    for (InPlaceCompactionFile f : sourceFiles) {
-      if (f.lockStatus == LockStatus.NO_LOCK) {
-        f.writeLock();
-      }
-      if (f.lockStatus == LockStatus.READ_LOCK) {
-        f.releaseReadLockAndWriteLock();
-      }
-      // delete metadata files
-      if (f instanceof InPlaceCompactionSeqFile) {
-        ((InPlaceCompactionSeqFile)f).deleteMetadataFile();
-      }
-    }
-    // delete compaction mods files
-    try {
-      CompactionUtils.deleteCompactionModsFile(selectedSequenceFiles, selectedUnsequenceFiles);
-    } catch (IOException e) {
-      LOGGER.error("Failed to remove compaction mods files");
+      throw new InPlaceCompactionErrorException("Failed to remove target resource and mods files", e);
     }
   }
 
@@ -501,234 +462,16 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
   private void releaseAllLocksAndResetStatus() {
     for (InPlaceCompactionFile inPlaceCompactionFile : inPlaceCompactionSeqFiles) {
       inPlaceCompactionFile.getTsFileResource().setStatus(TsFileResourceStatus.NORMAL);
-      inPlaceCompactionFile.release();
+      inPlaceCompactionFile.releaseLock();
     }
     for (InPlaceCompactionFile inPlaceCompactionFile : inPlaceCompactionUnSeqFiles) {
       inPlaceCompactionFile.getTsFileResource().setStatus(TsFileResourceStatus.NORMAL);
-      inPlaceCompactionFile.release();
+      inPlaceCompactionFile.releaseLock();
     }
   }
 
   @Override
   protected void createSummary() {
     summary = new FastCompactionTaskSummary();
-  }
-
-  private static abstract class InPlaceCompactionFile implements Closeable {
-    protected TsFileResource tsFileResource;
-    protected LockStatus lockStatus;
-
-    public InPlaceCompactionFile(TsFileResource resource) {
-      this.tsFileResource = resource;
-      this.lockStatus = LockStatus.NO_LOCK;
-    }
-
-    public TsFileResource getTsFileResource() {
-      return tsFileResource;
-    }
-
-    // release held write/read lock and do some other cleanup things.
-    public void release() {
-      if (lockStatus == LockStatus.READ_LOCK) {
-        readUnLock();
-      }
-      if (lockStatus == LockStatus.WRITE_LOCK) {
-        writeUnLock();
-      }
-    }
-
-    public void releaseReadLockAndWriteLock() {
-      readUnLock();
-      writeLock();
-    }
-
-    public void releaseWriteLockAndReadLock() {
-      writeUnLock();
-      readLock();
-    }
-
-    public void writeLock() {
-      tsFileResource.writeLock();
-      lockStatus = LockStatus.WRITE_LOCK;
-    }
-
-    public void writeUnLock() {
-      tsFileResource.writeUnlock();
-      lockStatus = LockStatus.NO_LOCK;
-    }
-
-    public void readLock() {
-      tsFileResource.readLock();
-      lockStatus = LockStatus.READ_LOCK;
-    }
-
-    public void readUnLock() {
-      tsFileResource.readUnlock();
-      lockStatus = LockStatus.NO_LOCK;
-    }
-  }
-
-  private static class InPlaceCompactionUnSeqFile extends InPlaceCompactionFile {
-
-    public InPlaceCompactionUnSeqFile(TsFileResource resource) {
-      super(resource);
-    }
-
-    @Override
-    public void close() throws IOException {
-      this.tsFileResource.close();
-    }
-  }
-
-  private enum LockStatus {
-    NO_LOCK,
-    READ_LOCK,
-    WRITE_LOCK
-  }
-
-  private static class InPlaceCompactionSeqFile extends InPlaceCompactionFile implements Closeable {
-    private long dataSize;
-    private long metadataSize;
-    private FileChannel tsFileChannel;
-    private FileChannel metaFileChannel;
-
-    public InPlaceCompactionSeqFile(TsFileResource resource) {
-      super(resource);
-    }
-
-    public void prepare() throws IOException {
-      File sourceFile = tsFileResource.getTsFile();
-      try (TsFileSequenceReader reader = new TsFileSequenceReader(sourceFile.getAbsolutePath())) {
-        this.metadataSize = reader.getAllMetadataSize();
-        this.dataSize = sourceFile.length() - metadataSize;
-      }
-    }
-
-    public boolean writeMetadataToMetaFile() {
-      try {
-        Files.createFile(getMetadataFile().toPath());
-        FileChannel src = getTsFileChannel();
-        FileChannel dst = getMetaFileChannel();
-        long transferSize = src.transferTo(dataSize, metadataSize, dst);
-        if (transferSize != metadataSize) {
-          return false;
-        }
-        dst.force(true);
-      } catch (IOException e) {
-
-        return false;
-      }
-      return true;
-    }
-
-    public boolean updateTsFileResourceStatusToSplit() {
-      return this.tsFileResource.setStatus(TsFileResourceStatus.SPLIT_DURING_COMPACTING);
-    }
-
-    public boolean updateTsFileResourceStatusToCompacting() {
-      return this.tsFileResource.setStatus(TsFileResourceStatus.COMPACTING);
-    }
-
-    public void recover() {
-      if (needReWriteFileMetaToTail()) {
-        // 重写尾部 meta
-        try {
-          FileChannel tsFileChannel = getTsFileChannel();
-          FileChannel metaFileChannel = getMetaFileChannel();
-          tsFileChannel.truncate(dataSize);
-          tsFileChannel.position(dataSize);
-          long transferSize = metaFileChannel.transferTo(0, metadataSize, tsFileChannel);
-          if (transferSize != metadataSize) {
-            throw new RuntimeException("Failed to recover TsFile");
-          }
-          tsFileChannel.force(true);
-
-          if (TsFileResourceStatus.SPLIT_DURING_COMPACTING.equals(tsFileResource.getStatus())) {
-            release();
-            writeLock();
-            updateTsFileResourceStatusToCompacting();
-            releaseWriteLockAndReadLock();
-          }
-        } catch (Exception e) {
-          // TODO
-        }
-      }
-    }
-
-    public void deleteMetadataFile() {
-      File metadataFile = getMetadataFile();
-      if (metadataFile.exists()) {
-        try {
-          Files.delete(metadataFile.toPath());
-        } catch (IOException e) {
-          // TODO
-          LOGGER.error("Failed to delete meta file {}", metadataFile.getAbsoluteFile());
-        }
-      }
-    }
-
-    public boolean truncateSourceFile() {
-      try {
-        FileChannel tsFileChannel = getTsFileChannel();
-        tsFileChannel.truncate(dataSize);
-        tsFileChannel.force(true);
-      } catch (IOException e) {
-        return false;
-      }
-      return true;
-    }
-
-    private boolean needReWriteFileMetaToTail() {
-      if (tsFileResource.getStatus() == TsFileResourceStatus.SPLIT_DURING_COMPACTING) {
-        return true;
-      }
-      // TODO: get real tmp meta file size
-      File metadataFile = getMetadataFile();
-      if (!metadataFile.exists()) {
-        return false;
-      }
-      return this.metadataSize == metadataFile.length();
-    }
-
-    @Override
-    public void close() throws IOException {
-      if (tsFileChannel != null) {
-        tsFileChannel.close();
-        tsFileChannel = null;
-      }
-      if (metaFileChannel != null) {
-        metaFileChannel.close();
-        metaFileChannel = null;
-      }
-    }
-
-    public File getMetadataFile() {
-      File dataFile = this.tsFileResource.getTsFile();
-      return new File(dataFile.getAbsolutePath() + ".tail");
-    }
-
-    public FileChannel getTsFileChannel() throws IOException {
-      if (tsFileChannel == null) {
-        this.tsFileChannel =
-            FileChannel.open(
-                tsFileResource.getTsFile().toPath(),
-                StandardOpenOption.READ,
-                StandardOpenOption.WRITE);
-      }
-      return this.tsFileChannel;
-    }
-
-    public FileChannel getMetaFileChannel() throws IOException {
-      if (metaFileChannel == null) {
-        File metaFile = getMetadataFile();
-        this.metaFileChannel =
-            FileChannel.open(metaFile.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
-      }
-      return this.metaFileChannel;
-    }
-
-    public long getDataSize() {
-      return this.dataSize;
-    }
   }
 }
