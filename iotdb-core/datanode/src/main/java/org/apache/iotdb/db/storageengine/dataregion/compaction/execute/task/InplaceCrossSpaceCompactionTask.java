@@ -147,7 +147,10 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     } catch (Exception e) {
       // recover source seq files
       recoverSeqFiles();
-      // merge compaction mods to source mods file
+      try {
+        CompactionUtils.deleteCompactionModsFile(selectedSequenceFiles, selectedUnsequenceFiles);
+      } catch (IOException ex) {
+      }
       // delete all target files if exist
     } finally {
       SystemInfo.getInstance().resetCompactionMemoryCost(memoryCost);
@@ -182,10 +185,15 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
         logger.logFile(f.getTsFileResource(), CompactionLogger.STR_SOURCE_FILES);
       }
     } catch (IOException e) {
+      LOGGER.error("Failed to prepare file info");
       return false;
     }
     // prepare files to perform InPlaceCompaction
-    return prepareBeforePerform();
+    if (!prepareBeforePerform()) {
+      recoverSeqFiles();
+      return false;
+    }
+    return true;
   }
 
   private boolean performInPlaceCompaction() {
@@ -320,6 +328,7 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
           dataSizeOfSourceSeqFiles,
           ((FastDeviceCompactionPerformer) performer).getRewriteDevices());
     } catch (Exception e) {
+
       return false;
     }
     return true;
@@ -333,10 +342,6 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
       resource.serialize();
       resource.closeWithoutSettingStatus();
     }
-  }
-
-  private boolean atomicRenameSeqSourceFileToTargetFile() {
-    return true;
   }
 
   private void recoverSeqFiles() {
