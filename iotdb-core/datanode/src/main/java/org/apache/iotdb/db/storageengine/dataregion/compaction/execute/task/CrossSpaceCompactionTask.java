@@ -28,7 +28,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionValidationFailedException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICrossCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.FastCompactionPerformer;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.FastDeviceCompactionPerformer;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.FastCompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.CompactionLogger;
@@ -416,7 +416,7 @@ public class CrossSpaceCompactionTask extends AbstractCompactionTask {
   @Override
   protected void createSummary() {
     if (performer instanceof FastCompactionPerformer
-        || performer instanceof FastDeviceCompactionPerformer) {
+        || performer instanceof InPlaceFastCompactionPerformer) {
       this.summary = new FastCompactionTaskSummary();
     } else {
       this.summary = new CompactionTaskSummary();

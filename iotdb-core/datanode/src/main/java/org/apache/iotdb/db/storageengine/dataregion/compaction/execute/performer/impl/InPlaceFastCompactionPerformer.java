@@ -65,7 +65,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
-public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer {
+public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer {
 
   private List<TsFileResource> seqFiles;
   private List<TsFileResource> unseqFiles;
@@ -78,7 +78,7 @@ public class FastDeviceCompactionPerformer implements ICrossCompactionPerformer 
   private Map<TsFileResource, DeviceTimeIndex> deviceTimeIndexMap;
   private Map<TsFileResource, TsFileSequenceReader> readerCacheMap;
 
-  public FastDeviceCompactionPerformer() {
+  public InPlaceFastCompactionPerformer() {
     this.rewriteDevices = new HashMap<>();
     this.deviceTimeIndexMap = new HashMap<>();
     this.readerCacheMap = new HashMap<>();

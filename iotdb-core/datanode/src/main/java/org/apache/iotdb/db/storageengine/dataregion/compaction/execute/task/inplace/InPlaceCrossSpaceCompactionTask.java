@@ -27,7 +27,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.InPlaceCompactionCleanupException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.InPlaceCompactionErrorException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICrossCompactionPerformer;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.FastDeviceCompactionPerformer;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.FastCompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
@@ -54,17 +54,19 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
+public class InPlaceCrossSpaceCompactionTask extends AbstractCompactionTask {
   private static final Logger LOGGER =
       LoggerFactory.getLogger(IoTDBConstant.COMPACTION_LOGGER_NAME);
-  private List<InPlaceCompactionSeqFile> inPlaceCompactionSeqFiles;
-  private List<InPlaceCompactionUnSeqFile> inPlaceCompactionUnSeqFiles;
-  private List<TsFileResource> selectedSequenceFiles;
-  private List<TsFileResource> selectedUnsequenceFiles;
-  private List<TsFileResource> targetFiles;
-  private long memoryCost;
+  private final List<InPlaceCompactionSeqFile> inPlaceCompactionSeqFiles;
+  private final List<InPlaceCompactionUnSeqFile> inPlaceCompactionUnSeqFiles;
+  private final List<TsFileResource> selectedSequenceFiles;
+  private final List<TsFileResource> selectedUnsequenceFiles;
+  private final List<TsFileResource> targetFiles;
+  private final long memoryCost;
+  private double selectedSeqFileSize;
+  private double selectedUnseqFileSize;
 
-  public InplaceCrossSpaceCompactionTask(
+  public InPlaceCrossSpaceCompactionTask(
       long timePartition,
       TsFileManager tsFileManager,
       List<TsFileResource> selectedSequenceFiles,
@@ -81,7 +83,13 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
         currentTaskNum,
         serialId);
     this.selectedSequenceFiles = selectedSequenceFiles;
+    for (TsFileResource resource : selectedSequenceFiles) {
+      this.selectedSeqFileSize += resource.getTsFileSize();
+    }
     this.selectedUnsequenceFiles = selectedUnsequenceFiles;
+    for (TsFileResource resource : selectedUnsequenceFiles) {
+      this.selectedUnseqFileSize += resource.getTsFileSize();
+    }
     // generate a copy of all source seq TsFileResource in memory
     this.targetFiles =
         selectedSequenceFiles.stream()
@@ -120,11 +128,11 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
   @Override
   @SuppressWarnings({"squid:S6541", "squid:S3776", "squid:S2142"})
   public boolean doCompaction() {
+    long startTime = System.currentTimeMillis();
     File logFile =
         new File(
             inPlaceCompactionSeqFiles.get(0).tsFileResource.getTsFile().getAbsolutePath()
                 + CompactionLogger.IN_PLACE_CROSS_COMPACTION_LOG_NAME_SUFFIX);
-    boolean isSuccess = true;
     try (CompactionLogger logger = new CompactionLogger(logFile)) {
 
       initSeqFileInfo();
@@ -147,6 +155,18 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
       removeRemainingSourceFiles();
       // <<< 删除已经用完的源文件及其附属文件
       CompactionMetrics.getInstance().recordSummaryInfo(summary);
+
+      double costTime = (System.currentTimeMillis() - startTime) / 1000.0d;
+      LOGGER.info(
+          "{}-{} [Compaction] InPlaceCrossSpaceCompaction task finishes successfully, "
+              + "time cost is {} s, "
+              + "compaction speed is {} MB/s, {}",
+          storageGroupName,
+          dataRegionId,
+          String.format("%.2f", costTime),
+          String.format(
+              "%.2f", (selectedSeqFileSize + selectedUnseqFileSize) / 1024.0d / 1024.0d / costTime),
+          summary);
       return true;
     } catch (InPlaceCompactionErrorException | IOException e) {
       LOGGER.error("In place compaction error. Set AllCompaction to false.", e);
@@ -167,11 +187,16 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
       // <<< 系统资源释放
 
       // >>> 重置原始文件
-      for (InPlaceCompactionFile f : this.inPlaceCompactionSeqFiles) {
-        f.releaseResourceAndResetStatus();
-      }
-      for (InPlaceCompactionFile f : this.inPlaceCompactionUnSeqFiles) {
-        f.releaseResourceAndResetStatus();
+      List<InPlaceCompactionFile> files =
+          new ArrayList<>(inPlaceCompactionSeqFiles.size() + inPlaceCompactionUnSeqFiles.size());
+      files.addAll(inPlaceCompactionSeqFiles);
+      files.addAll(inPlaceCompactionUnSeqFiles);
+      for (InPlaceCompactionFile f : files) {
+        try {
+          f.releaseResourceAndResetStatus();
+        } catch (IOException e) {
+          LOGGER.error("Failed to release resource and reset status", e);
+        }
       }
       // <<< 重置原始文件
     }
@@ -310,7 +335,7 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
           selectedSequenceFiles,
           selectedUnsequenceFiles,
           dataSizeOfSourceSeqFiles,
-          ((FastDeviceCompactionPerformer) performer).getRewriteDevices());
+          ((InPlaceFastCompactionPerformer) performer).getRewriteDevices());
     } catch (Exception e) {
       throw new InPlaceCompactionErrorException(
           "Can not prepare resource and mods file for target TsFileResource", e);
@@ -395,11 +420,11 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
 
   @Override
   public boolean equalsOtherTask(AbstractCompactionTask otherTask) {
-    if (!(otherTask instanceof InplaceCrossSpaceCompactionTask)) {
+    if (!(otherTask instanceof InPlaceCrossSpaceCompactionTask)) {
       return false;
     }
-    InplaceCrossSpaceCompactionTask otherCrossCompactionTask =
-        (InplaceCrossSpaceCompactionTask) otherTask;
+    InPlaceCrossSpaceCompactionTask otherCrossCompactionTask =
+        (InPlaceCrossSpaceCompactionTask) otherTask;
     return this.selectedSequenceFiles.equals(otherCrossCompactionTask.selectedSequenceFiles)
         && this.selectedUnsequenceFiles.equals(otherCrossCompactionTask.selectedUnsequenceFiles)
         && this.performer.getClass().isInstance(otherCrossCompactionTask.performer);

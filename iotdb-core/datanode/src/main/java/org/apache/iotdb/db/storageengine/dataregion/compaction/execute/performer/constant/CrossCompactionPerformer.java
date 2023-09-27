@@ -22,17 +22,21 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performe
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.IllegalCompactionPerformerException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICrossCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.FastCompactionPerformer;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.ReadPointCompactionPerformer;
 
 public enum CrossCompactionPerformer {
   READ_POINT,
-  FAST;
+  FAST,
+  INPLACE_FAST;
 
   public static CrossCompactionPerformer getCrossCompactionPerformer(String name) {
     if (READ_POINT.toString().equalsIgnoreCase(name)) {
       return READ_POINT;
     } else if (FAST.toString().equalsIgnoreCase(name)) {
       return FAST;
+    } else if (INPLACE_FAST.toString().equalsIgnoreCase(name)) {
+      return INPLACE_FAST;
     }
     throw new IllegalCompactionPerformerException(
         "Illegal compaction performer for cross compaction " + name);
@@ -44,6 +48,8 @@ public enum CrossCompactionPerformer {
         return new ReadPointCompactionPerformer();
       case FAST:
         return new FastCompactionPerformer(true);
+      case INPLACE_FAST:
+        return new InPlaceFastCompactionPerformer();
       default:
         throw new IllegalCompactionPerformerException(
             "Illegal compaction performer for cross compaction " + this);
