@@ -122,81 +122,89 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     boolean canRecover = existSeqFiles.size() + existTargetFileNum == sourceSeqFileNum;
     if (!canRecover) {
       logger.error("Can not recover InPlaceCrossSpaceCompaction because some file is lost");
+
       return;
     }
 
     if (allSourceFileExists) {
-      // recover source files
-      for (TsFileIdentifier identifier : existSeqFiles) {
-        File f = new File(identifier.getFilePath());
-        TsFileResource resource = new TsFileResource();
-        resource.setFile(f);
-        InPlaceCompactionSeqFile seqFile = null;
-        try {
-          seqFile = new InPlaceCompactionSeqFile(resource);
-          seqFile.setDataSize(identifier.getDataSize());
-          seqFile.setMetadataSize(identifier.getMetadataSize());
-          seqFile.revert();
-        } catch (InPlaceCompactionErrorException e) {
-          logger.error("Failed to recover InPlaceCrossSpaceCompaction", e);
-        } finally {
-          if (seqFile != null) {
-            try {
-              seqFile.releaseResourceAndResetStatus();
-            } catch (IOException e) {
-              logger.error("");
-            }
+      handleWithAllSourceFileExists(existSeqFiles, existUnSeqFiles, targetFileIdentifiers);
+    } else {
+      handleWithSomeSourceFileLost(existSeqFiles, existUnSeqFiles);
+    }
+  }
+
+  private void handleWithAllSourceFileExists(List<TsFileIdentifier> existSeqFiles, List<TsFileIdentifier> existUnSeqFiles, List<TsFileIdentifier> targetFileIdentifiers) {
+    // recover source files
+    for (TsFileIdentifier identifier : existSeqFiles) {
+      TsFileResource resource = getTsFileResource(identifier);
+      InPlaceCompactionSeqFile seqFile = null;
+      try {
+        seqFile = new InPlaceCompactionSeqFile(resource);
+        seqFile.setDataSize(identifier.getDataSize());
+        seqFile.setMetadataSize(identifier.getMetadataSize());
+        seqFile.revert();
+      } catch (InPlaceCompactionErrorException e) {
+        logger.error("Failed to recover InPlaceCrossSpaceCompaction", e);
+      } finally {
+        if (seqFile != null) {
+          try {
+            seqFile.releaseResourceAndResetStatus();
+          } catch (IOException e) {
+            logger.error("");
           }
         }
       }
-      for (TsFileIdentifier identifier : existUnSeqFiles) {
-        File f = new File(identifier.getFilePath());
-        TsFileResource resource = new TsFileResource();
-        resource.setFile(f);
-        InPlaceCompactionUnSeqFile unSeqFile = new InPlaceCompactionUnSeqFile(resource);
-        try {
-          unSeqFile.revert();
-        } catch (InPlaceCompactionErrorException e) {
-          logger.error("");
-        }
-      }
-      // remove target files
-      for (TsFileIdentifier identifier : targetFileIdentifiers) {
-        File f = new File(identifier.getFilePath());
-        TsFileResource resource = new TsFileResource();
-        resource.setFile(f);
-        try {
-          resource.getCompactionModFile().remove();
-        } catch (IOException e) {
-
-        }
-        resource.remove();
-      }
-    } else {
-      // 1. remove all source files
-      // 2. rename seq files to target file
+    }
+    for (TsFileIdentifier identifier : existUnSeqFiles) {
+      TsFileResource resource = getTsFileResource(identifier);
+      InPlaceCompactionUnSeqFile unSeqFile = new InPlaceCompactionUnSeqFile(resource);
       try {
-
-        for (TsFileIdentifier identifier : existUnSeqFiles) {
-          File f = new File(identifier.getFilePath());
-          TsFileResource resource = new TsFileResource();
-          resource.setFile(f);
-          resource.getCompactionModFile().remove();
-          resource.remove();
-        }
-        for (TsFileIdentifier identifier : existSeqFiles) {
-          File f = new File(identifier.getFilePath());
-          TsFileResource resource = new TsFileResource();
-          resource.setFile(f);
-          File targetFile = TsFileNameGenerator.getCrossSpaceCompactionTargetFile(resource, false);
-          Files.move(f.toPath(), targetFile.toPath());
-
-          resource.getCompactionModFile().remove();
-          resource.remove();
-        }
+        unSeqFile.revert();
+      } catch (InPlaceCompactionErrorException e) {
+        logger.error("");
+      }
+    }
+    // remove target files
+    for (TsFileIdentifier identifier : targetFileIdentifiers) {
+      try {
+        deleteResourceAndModsFile(identifier);
       } catch (IOException e) {
         logger.error("");
       }
     }
+  }
+
+  private void handleWithSomeSourceFileLost(List<TsFileIdentifier> existSeqFiles, List<TsFileIdentifier> existUnSeqFiles) {
+    // 1. remove all source files
+    // 2. rename seq files to target file
+    try {
+
+      for (TsFileIdentifier identifier : existUnSeqFiles) {
+        deleteResourceAndModsFile(identifier);
+      }
+      for (TsFileIdentifier identifier : existSeqFiles) {
+        TsFileResource resource = getTsFileResource(identifier);
+        File targetFile = TsFileNameGenerator.getCrossSpaceCompactionTargetFile(resource, false);
+        Files.move(resource.getTsFile().toPath(), targetFile.toPath());
+
+        resource.getCompactionModFile().remove();
+        resource.remove();
+      }
+    } catch (IOException e) {
+      logger.error("");
+    }
+  }
+
+  private void deleteResourceAndModsFile(TsFileIdentifier identifier) throws IOException {
+    TsFileResource resource = getTsFileResource(identifier);
+    resource.getCompactionModFile().remove();
+    resource.remove();
+  }
+
+  private TsFileResource getTsFileResource(TsFileIdentifier identifier) {
+    File f = new File(identifier.getFilePath());
+    TsFileResource resource = new TsFileResource();
+    resource.setFile(f);
+    return resource;
   }
 }
