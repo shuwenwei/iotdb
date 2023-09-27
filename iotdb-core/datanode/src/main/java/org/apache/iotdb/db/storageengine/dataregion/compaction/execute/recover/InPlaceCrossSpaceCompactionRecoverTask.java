@@ -20,8 +20,10 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.recover;
 
 import org.apache.iotdb.commons.conf.IoTDBConstant;
+import org.apache.iotdb.commons.utils.FileUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.InPlaceCompactionErrorException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCompactionSeqFile;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCompactionUnSeqFile;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.CompactionLogAnalyzer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.TsFileIdentifier;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
@@ -147,20 +149,50 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
           }
         }
       }
+      for (TsFileIdentifier identifier : existUnSeqFiles) {
+        File f = new File(identifier.getFilePath());
+        TsFileResource resource = new TsFileResource();
+        resource.setFile(f);
+        InPlaceCompactionUnSeqFile unSeqFile = new InPlaceCompactionUnSeqFile(resource);
+        try {
+          unSeqFile.revert();
+        } catch (InPlaceCompactionErrorException e) {
+          logger.error("");
+        }
+      }
+      // remove target files
+      for (TsFileIdentifier identifier : targetFileIdentifiers) {
+        File f = new File(identifier.getFilePath());
+        TsFileResource resource = new TsFileResource();
+        resource.setFile(f);
+        try {
+          resource.getCompactionModFile().remove();
+        } catch (IOException e) {
+
+        }
+        resource.remove();
+      }
     } else {
-      // 1. remove all unseq files
+      // 1. remove all source files
       // 2. rename seq files to target file
       try {
+
         for (TsFileIdentifier identifier : existUnSeqFiles) {
           File f = new File(identifier.getFilePath());
-          Files.deleteIfExists(f.toPath());
+          TsFileResource resource = new TsFileResource();
+          resource.setFile(f);
+          resource.getCompactionModFile().remove();
+          resource.remove();
         }
         for (TsFileIdentifier identifier : existSeqFiles) {
           File f = new File(identifier.getFilePath());
           TsFileResource resource = new TsFileResource();
           resource.setFile(f);
           File targetFile = TsFileNameGenerator.getCrossSpaceCompactionTargetFile(resource, false);
-          f.renameTo(targetFile);
+          Files.move(f.toPath(), targetFile.toPath());
+
+          resource.getCompactionModFile().remove();
+          resource.remove();
         }
       } catch (IOException e) {
         logger.error("");
