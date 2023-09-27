@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -19,22 +19,23 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception;
 
-public class InPlaceCompactionCleanupException extends Exception {
-  public InPlaceCompactionCleanupException() {}
+public class CompactionRecoverException extends RuntimeException {
 
-  public InPlaceCompactionCleanupException(String message) {
+  public CompactionRecoverException() {}
+
+  public CompactionRecoverException(String message) {
     super(message);
   }
 
-  public InPlaceCompactionCleanupException(String message, Throwable cause) {
+  public CompactionRecoverException(String message, Throwable cause) {
     super(message, cause);
   }
 
-  public InPlaceCompactionCleanupException(Throwable cause) {
+  public CompactionRecoverException(Throwable cause) {
     super(cause);
   }
 
-  public InPlaceCompactionCleanupException(
+  public CompactionRecoverException(
       String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
     super(message, cause, enableSuppression, writableStackTrace);
   }

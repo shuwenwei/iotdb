@@ -102,14 +102,15 @@ public class CompactionLogger implements AutoCloseable {
   public static File[] findCompactionLogs(boolean isInnerSpace, String directory) {
     File timePartitionDir = new File(directory);
     if (timePartitionDir.exists()) {
-      return timePartitionDir.listFiles((dir, name) -> {
-        if (isInnerSpace) {
-          return name.endsWith(INNER_COMPACTION_LOG_NAME_SUFFIX);
-        } else {
-          return name.endsWith(CROSS_COMPACTION_LOG_NAME_SUFFIX)
-              || name.endsWith(IN_PLACE_CROSS_COMPACTION_LOG_NAME_SUFFIX);
-        }
-      });
+      return timePartitionDir.listFiles(
+          (dir, name) -> {
+            if (isInnerSpace) {
+              return name.endsWith(INNER_COMPACTION_LOG_NAME_SUFFIX);
+            } else {
+              return name.endsWith(CROSS_COMPACTION_LOG_NAME_SUFFIX)
+                  || name.endsWith(IN_PLACE_CROSS_COMPACTION_LOG_NAME_SUFFIX);
+            }
+          });
     } else {
       return new File[0];
     }

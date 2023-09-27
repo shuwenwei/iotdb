@@ -84,7 +84,6 @@ public class CompactionLogAnalyzer {
         switch (curLine) {
           case STR_SOURCE_FILES_FROM_OLD:
             curLine = bufferedReader.readLine();
-
         }
       }
     }

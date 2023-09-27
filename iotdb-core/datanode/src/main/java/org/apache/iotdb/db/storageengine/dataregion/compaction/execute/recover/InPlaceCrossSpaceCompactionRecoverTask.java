@@ -20,7 +20,7 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.recover;
 
 import org.apache.iotdb.commons.conf.IoTDBConstant;
-import org.apache.iotdb.commons.utils.FileUtils;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionRecoverException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.InPlaceCompactionErrorException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCompactionSeqFile;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCompactionUnSeqFile;
@@ -29,6 +29,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +85,13 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
       return;
     }
 
-    recoverCompactionFiles(sourceFileIdentifiers, targetFileIdentifiers);
+    try {
+      recoverCompactionFiles(sourceFileIdentifiers, targetFileIdentifiers);
+    } catch (CompactionRecoverException e) {
+      logger.error("", e);
+      tsFileManager.setAllowCompaction(false);
+      return;
+    }
 
     try {
       Files.deleteIfExists(compactionLogFile.toPath());
@@ -93,7 +100,8 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     }
   }
 
-  private void recoverCompactionFiles(List<TsFileIdentifier> sourceFileIdentifiers, List<TsFileIdentifier> targetFileIdentifiers) {
+  private void recoverCompactionFiles(
+      List<TsFileIdentifier> sourceFileIdentifiers, List<TsFileIdentifier> targetFileIdentifiers) {
     List<TsFileIdentifier> existSeqFiles = new ArrayList<>();
     List<TsFileIdentifier> existUnSeqFiles = new ArrayList<>();
 
@@ -133,7 +141,10 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     }
   }
 
-  private void handleWithAllSourceFileExists(List<TsFileIdentifier> existSeqFiles, List<TsFileIdentifier> existUnSeqFiles, List<TsFileIdentifier> targetFileIdentifiers) {
+  private void handleWithAllSourceFileExists(
+      List<TsFileIdentifier> existSeqFiles,
+      List<TsFileIdentifier> existUnSeqFiles,
+      List<TsFileIdentifier> targetFileIdentifiers) {
     // recover source files
     for (TsFileIdentifier identifier : existSeqFiles) {
       TsFileResource resource = getTsFileResource(identifier);
@@ -144,7 +155,7 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
         seqFile.setMetadataSize(identifier.getMetadataSize());
         seqFile.revert();
       } catch (InPlaceCompactionErrorException e) {
-        logger.error("Failed to recover InPlaceCrossSpaceCompaction", e);
+        throw new CompactionRecoverException("");
       } finally {
         if (seqFile != null) {
           try {
@@ -174,7 +185,8 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     }
   }
 
-  private void handleWithSomeSourceFileLost(List<TsFileIdentifier> existSeqFiles, List<TsFileIdentifier> existUnSeqFiles) {
+  private void handleWithSomeSourceFileLost(
+      List<TsFileIdentifier> existSeqFiles, List<TsFileIdentifier> existUnSeqFiles) {
     // 1. remove all source files
     // 2. rename seq files to target file
     try {
@@ -197,7 +209,9 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
 
   private void deleteResourceAndModsFile(TsFileIdentifier identifier) throws IOException {
     TsFileResource resource = getTsFileResource(identifier);
+    // delete compaction mods file
     resource.getCompactionModFile().remove();
+    // delete resource and mods file
     resource.remove();
   }
 

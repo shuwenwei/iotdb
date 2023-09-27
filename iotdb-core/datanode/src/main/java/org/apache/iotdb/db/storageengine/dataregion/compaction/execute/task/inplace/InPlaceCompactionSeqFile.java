@@ -55,7 +55,10 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
     releaseReadLockAndWriteLock();
     // 3. change TsFileResource status
     if (!updateTsFileResourceStatusToSplit()) {
-      throw new InPlaceCompactionErrorException(String.format("cannot set TsFileResource to SPLIT_DURING_COMPACTING. File: %s, current status: %s ", tsFileResource.getTsFilePath(), tsFileResource.getStatus()));
+      throw new InPlaceCompactionErrorException(
+          String.format(
+              "cannot set TsFileResource to SPLIT_DURING_COMPACTING. File: %s, current status: %s ",
+              tsFileResource.getTsFilePath(), tsFileResource.getStatus()));
     }
     // 4. truncate source file
     truncateSourceFile();
@@ -70,7 +73,10 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
       FileChannel dst = getMetaFileChannel();
       long transferSize = src.transferTo(dataSize, metadataSize, dst);
       if (transferSize != metadataSize) {
-        throw new InPlaceCompactionErrorException(String.format("error when writing metadata file. transferred size is not consistent. transferSize: %d, expected size: %d", transferSize, metadataSize));
+        throw new InPlaceCompactionErrorException(
+            String.format(
+                "error when writing metadata file. transferred size is not consistent. transferSize: %d, expected size: %d",
+                transferSize, metadataSize));
       }
       dst.force(true);
     } catch (IOException e) {
@@ -89,7 +95,7 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
   public void deleteMetadataFile() throws IOException {
     File metadataFile = getMetadataFile();
     if (metadataFile.exists()) {
-        Files.delete(metadataFile.toPath());
+      Files.delete(metadataFile.toPath());
     }
   }
 
@@ -141,7 +147,9 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
       tsFileChannel.truncate(dataSize);
       tsFileChannel.force(true);
     } catch (IOException e) {
-      throw new InPlaceCompactionErrorException(String.format("error when truncating source file: %s", tsFileResource.getTsFilePath()), e);
+      throw new InPlaceCompactionErrorException(
+          String.format("error when truncating source file: %s", tsFileResource.getTsFilePath()),
+          e);
     }
   }
 

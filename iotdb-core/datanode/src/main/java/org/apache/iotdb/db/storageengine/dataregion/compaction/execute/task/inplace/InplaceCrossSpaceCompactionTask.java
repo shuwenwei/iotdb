@@ -177,7 +177,8 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     }
   }
 
-  private void recordLogBeforeDoingCompaction(CompactionLogger logger) throws InPlaceCompactionErrorException {
+  private void recordLogBeforeDoingCompaction(CompactionLogger logger)
+      throws InPlaceCompactionErrorException {
     try {
       // record seq files in log
       for (InPlaceCompactionSeqFile f : this.inPlaceCompactionSeqFiles) {
@@ -311,7 +312,8 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
           dataSizeOfSourceSeqFiles,
           ((FastDeviceCompactionPerformer) performer).getRewriteDevices());
     } catch (Exception e) {
-      throw new InPlaceCompactionErrorException("Can not prepare resource and mods file for target TsFileResource", e);
+      throw new InPlaceCompactionErrorException(
+          "Can not prepare resource and mods file for target TsFileResource", e);
     }
   }
 
@@ -331,7 +333,8 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
       removeTargetResourceAndModsFiles();
     } catch (InPlaceCompactionErrorException e) {
       tsFileManager.setAllowCompaction(false);
-      LOGGER.error("fetal error. recover InPlaceCompactionTask failed. Please recover it manually", e);
+      LOGGER.error(
+          "fetal error. recover InPlaceCompactionTask failed. Please recover it manually", e);
     }
   }
 
@@ -385,7 +388,8 @@ public class InplaceCrossSpaceCompactionTask extends AbstractCompactionTask {
         }
       }
     } catch (IOException e) {
-      throw new InPlaceCompactionErrorException("Failed to remove target resource and mods files", e);
+      throw new InPlaceCompactionErrorException(
+          "Failed to remove target resource and mods files", e);
     }
   }
 
