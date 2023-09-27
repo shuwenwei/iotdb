@@ -133,9 +133,15 @@ public class CompactionRecoverManager {
         CompactionLogger.findCompactionLogs(isInnerSpace, timePartitionDir.getPath());
     for (File compactionLog : compactionLogs) {
       logger.info("Calling compaction recover task.");
-      new CompactionRecoverTask(
-              logicalStorageGroupName, dataRegionId, tsFileManager, compactionLog, isInnerSpace)
-          .doCompaction();
+      if (!isInnerSpace && compactionLog.getAbsolutePath().endsWith(CompactionLogger.IN_PLACE_CROSS_COMPACTION_LOG_NAME_SUFFIX)) {
+        new InPlaceCrossSpaceCompactionRecoverTask(
+            logicalStorageGroupName, dataRegionId, tsFileManager, compactionLog)
+            .doCompaction();
+      } else {
+        new CompactionRecoverTask(
+            logicalStorageGroupName, dataRegionId, tsFileManager, compactionLog, isInnerSpace)
+            .doCompaction();
+      }
     }
   }
 

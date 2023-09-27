@@ -77,6 +77,19 @@ public class CompactionLogAnalyzer {
     }
   }
 
+  public void analyzeInPlaceCrossSpaceCompactionLog() throws IOException {
+    String curLine;
+    try (BufferedReader bufferedReader = new BufferedReader(new FileReader(logFile))) {
+      while ((curLine = bufferedReader.readLine()) != null) {
+        switch (curLine) {
+          case STR_SOURCE_FILES_FROM_OLD:
+            curLine = bufferedReader.readLine();
+
+        }
+      }
+    }
+  }
+
   /**
    * Analyze inner space compaction log of previous version (<0.13).
    *

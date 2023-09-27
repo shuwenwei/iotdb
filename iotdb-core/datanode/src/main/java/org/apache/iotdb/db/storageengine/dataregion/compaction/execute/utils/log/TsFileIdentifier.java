@@ -37,6 +37,9 @@ public class TsFileIdentifier {
   private final String timePartitionId;
   private final boolean sequence;
   private String filename;
+  private long dataSize;
+  private long metadataSize;
+
   public static final String INFO_SEPARATOR = " ";
   // Notice: Do not change the offset of info
   public static final int FILE_NAME_OFFSET_IN_PATH = 1;
@@ -50,6 +53,8 @@ public class TsFileIdentifier {
   public static final int DATA_REGION_OFFSET_IN_LOG = 2;
   public static final int TIME_PARTITION_OFFSET_IN_LOG = 3;
   public static final int FILE_NAME_OFFSET_IN_LOG = 4;
+  public static final int SPLIT_FILE_DATA_SIZE_OFFSET_IN_LOG = 5;
+  public static final int SPLIT_FILE_METADATA_SIZE_OFFSET_IN_LOG = 6;
 
   private static final int LOGICAL_SG_OFFSET_IN_LOG_FROM_OLD = 0;
   private static final int DATA_REGION_OFFSET_IN_LOG_FROM_OLD = 1;
@@ -71,6 +76,23 @@ public class TsFileIdentifier {
     this.timePartitionId = timePartitionId;
     this.sequence = sequence;
     this.filename = filename;
+  }
+
+  private TsFileIdentifier(
+      String logicalStorageGroupName,
+      String dataRegionId,
+      String timePartitionId,
+      boolean sequence,
+      String filename,
+      long dataSize,
+      long metadataSize) {
+    this.logicalStorageGroupName = logicalStorageGroupName;
+    this.dataRegionId = dataRegionId;
+    this.timePartitionId = timePartitionId;
+    this.sequence = sequence;
+    this.filename = filename;
+    this.dataSize = dataSize;
+    this.metadataSize = metadataSize;
   }
 
   /**
@@ -111,16 +133,26 @@ public class TsFileIdentifier {
   public static TsFileIdentifier getFileIdentifierFromInfoString(String infoString) {
     String[] splittedFileInfo = infoString.split(INFO_SEPARATOR);
     int length = splittedFileInfo.length;
-    if (length != 5) {
+    if (length == 5) {
+      return new TsFileIdentifier(
+          splittedFileInfo[LOGICAL_SG_OFFSET_IN_LOG],
+          splittedFileInfo[DATA_REGION_OFFSET_IN_LOG],
+          splittedFileInfo[TIME_PARTITION_OFFSET_IN_LOG],
+          splittedFileInfo[SEQUENCE_OFFSET_IN_LOG].equals(SEQUENCE_STR),
+          splittedFileInfo[FILE_NAME_OFFSET_IN_LOG]);
+    } else if (length == 7) {
+      return new TsFileIdentifier(
+          splittedFileInfo[LOGICAL_SG_OFFSET_IN_LOG],
+          splittedFileInfo[DATA_REGION_OFFSET_IN_LOG],
+          splittedFileInfo[TIME_PARTITION_OFFSET_IN_LOG],
+          splittedFileInfo[SEQUENCE_OFFSET_IN_LOG].equals(SEQUENCE_STR),
+          splittedFileInfo[FILE_NAME_OFFSET_IN_LOG],
+          Long.parseLong(splittedFileInfo[SPLIT_FILE_DATA_SIZE_OFFSET_IN_LOG]),
+          Long.parseLong(splittedFileInfo[SPLIT_FILE_METADATA_SIZE_OFFSET_IN_LOG]));
+    } else {
       throw new RuntimeException(
           String.format("String %s is not a legal file info string", infoString));
     }
-    return new TsFileIdentifier(
-        splittedFileInfo[LOGICAL_SG_OFFSET_IN_LOG],
-        splittedFileInfo[DATA_REGION_OFFSET_IN_LOG],
-        splittedFileInfo[TIME_PARTITION_OFFSET_IN_LOG],
-        splittedFileInfo[SEQUENCE_OFFSET_IN_LOG].equals(SEQUENCE_STR),
-        splittedFileInfo[FILE_NAME_OFFSET_IN_LOG]);
   }
 
   /**
@@ -239,5 +271,13 @@ public class TsFileIdentifier {
 
   public boolean isSequence() {
     return sequence;
+  }
+
+  public long getDataSize() {
+    return dataSize;
+  }
+
+  public long getMetadataSize() {
+    return metadataSize;
   }
 }

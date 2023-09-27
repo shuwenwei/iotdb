@@ -186,7 +186,15 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
     return this.dataSize;
   }
 
+  public void setDataSize(long dataSize) {
+    this.dataSize = dataSize;
+  }
+
   public long getMetadataSize() {
     return metadataSize;
+  }
+
+  public void setMetadataSize(long metadataSize) {
+    this.metadataSize = metadataSize;
   }
 }
