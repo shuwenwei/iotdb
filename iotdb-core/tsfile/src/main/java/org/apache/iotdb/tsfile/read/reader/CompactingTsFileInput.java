@@ -50,6 +50,14 @@ public class CompactingTsFileInput implements TsFileInput {
     metadataSize = metadataFileChannel.size();
   }
 
+  public CompactingTsFileInput(Path tsFile, long dataSize, Path metadataFile) throws IOException {
+    filePath = tsFile.toFile().getAbsolutePath();
+    dataFileChannel = FileChannel.open(tsFile, StandardOpenOption.READ);
+    this.dataSize = dataSize;
+    metadataFileChannel = FileChannel.open(metadataFile, StandardOpenOption.READ);
+    metadataSize = metadataFileChannel.size();
+  }
+
   @Override
   public long size() throws IOException {
     return dataSize + metadataSize;

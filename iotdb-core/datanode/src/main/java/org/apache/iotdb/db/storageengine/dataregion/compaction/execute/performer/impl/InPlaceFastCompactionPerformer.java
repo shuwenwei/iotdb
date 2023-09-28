@@ -49,9 +49,6 @@ import org.apache.iotdb.tsfile.write.schema.MeasurementSchema;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -73,12 +70,13 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
   private FastCompactionTaskSummary subTaskSummary;
   private static final int SUB_TASK_NUM =
       IoTDBDescriptor.getInstance().getConfig().getSubCompactionTaskNum();
-  private Map<TsFileResource, List<Modification>> modificationCache = new ConcurrentHashMap<>();
-  private Map<TsFileResource, Set<String>> rewriteDevices;
-  private Map<TsFileResource, DeviceTimeIndex> deviceTimeIndexMap;
-  private Map<TsFileResource, TsFileSequenceReader> readerCacheMap;
+  private final Map<TsFileResource, List<Modification>> modificationCache;
+  private final Map<TsFileResource, Set<String>> rewriteDevices;
+  private final Map<TsFileResource, DeviceTimeIndex> deviceTimeIndexMap;
+  private final Map<TsFileResource, TsFileSequenceReader> readerCacheMap;
 
   public InPlaceFastCompactionPerformer() {
+    this.modificationCache = new ConcurrentHashMap<>();
     this.rewriteDevices = new HashMap<>();
     this.deviceTimeIndexMap = new HashMap<>();
     this.readerCacheMap = new HashMap<>();
@@ -179,48 +177,9 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
     }
   }
 
-  private List<DeviceTimeIndex> buildDeviceTimeIndexList(List<TsFileResource> resources)
-      throws IOException {
-    List<DeviceTimeIndex> deviceTimeIndexList = new ArrayList<>(resources.size());
+  private void buildDeviceTimeIndexList(List<TsFileResource> resources) throws IOException {
     for (TsFileResource resource : resources) {
-      DeviceTimeIndex deviceTimeIndex = getDeviceTimeIndex(resource);
-      deviceTimeIndexList.add(deviceTimeIndex);
-    }
-    return deviceTimeIndexList;
-  }
-
-  private void moveMetadataToTempFile(List<TsFileResource> resources) throws IOException {
-    for (TsFileResource resource : resources) {
-      File sourceTsFile = resource.getTsFile();
-      File metadataFile = new File(sourceTsFile.getAbsolutePath() + ".mt");
-      Files.createFile(metadataFile.toPath());
-      moveMetadataToTempFile(sourceTsFile, metadataFile);
-    }
-  }
-
-  private void moveMetadataToTempFile(File srcFile, File dstFile) {
-    try (TsFileSequenceReader reader = new TsFileSequenceReader(srcFile.getAbsolutePath());
-        FileChannel srcChannel =
-            FileChannel.open(srcFile.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE);
-        FileChannel dstChannel = FileChannel.open(dstFile.toPath(), StandardOpenOption.WRITE)) {
-      long fileSize = srcChannel.size();
-      long metadataSize = reader.getAllMetadataSize();
-      long transferSize = srcChannel.transferTo(fileSize - metadataSize, metadataSize, dstChannel);
-      if (transferSize != metadataSize) {
-        throw new RuntimeException();
-      }
-      dstChannel.force(true);
-      // release read lock
-      // acquire write lock
-      srcChannel.truncate(fileSize - metadataSize);
-      srcChannel.force(true);
-      // update status separate-metadata
-      // release write lock
-
-      // acquire read lock
-    } catch (IOException e) {
-      // todo
-      e.printStackTrace();
+      getDeviceTimeIndex(resource);
     }
   }
 
