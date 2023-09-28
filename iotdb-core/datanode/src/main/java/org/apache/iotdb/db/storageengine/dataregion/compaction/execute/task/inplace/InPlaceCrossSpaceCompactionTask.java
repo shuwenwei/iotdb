@@ -151,7 +151,15 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCompactionTask {
 
       // 对目标文件进行重叠验证和文件正确性验证
       CompactionValidator validator = CompactionValidator.getInstance();
-      if (!validator.validateCompaction(storageGroupName, tsFileManager, timePartition, selectedSequenceFiles, selectedUnsequenceFiles, targetFiles, false, true)) {
+      if (!validator.validateCompaction(
+          storageGroupName,
+          tsFileManager,
+          timePartition,
+          selectedSequenceFiles,
+          selectedUnsequenceFiles,
+          targetFiles,
+          false,
+          true)) {
         throw new CompactionValidationFailedException("Failed to pass compaction validation");
       }
 

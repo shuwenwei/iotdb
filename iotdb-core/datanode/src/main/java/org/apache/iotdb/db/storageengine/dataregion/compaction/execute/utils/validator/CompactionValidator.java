@@ -43,6 +43,7 @@ import org.apache.iotdb.tsfile.read.reader.page.TimePageReader;
 import org.apache.iotdb.tsfile.read.reader.page.ValuePageReader;
 import org.apache.iotdb.tsfile.utils.Pair;
 import org.apache.iotdb.tsfile.utils.TsPrimitiveType;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,10 +57,18 @@ import java.util.Set;
 
 public interface CompactionValidator {
 
-   Logger logger =
-      LoggerFactory.getLogger(IoTDBConstant.COMPACTION_LOGGER_NAME);
+  Logger logger = LoggerFactory.getLogger(IoTDBConstant.COMPACTION_LOGGER_NAME);
 
-  boolean validateCompaction(String storageGroupName, TsFileManager manager, long timePartition, List<TsFileResource> sourceSeqTsFileList, List<TsFileResource> sourceUnSeqFileList, List<TsFileResource> targetTsFileList, boolean isInnerUnSequenceSpaceTask, boolean isInPlaceCrossSpaceCompaction) throws IOException;
+  boolean validateCompaction(
+      String storageGroupName,
+      TsFileManager manager,
+      long timePartition,
+      List<TsFileResource> sourceSeqTsFileList,
+      List<TsFileResource> sourceUnSeqFileList,
+      List<TsFileResource> targetTsFileList,
+      boolean isInnerUnSequenceSpaceTask,
+      boolean isInPlaceCrossSpaceCompaction)
+      throws IOException;
 
   static CompactionValidator getInstance() {
     CompactionValidationLevel level =
@@ -74,8 +83,15 @@ public interface CompactionValidator {
     }
   }
 
-  default boolean validateTsFileResources(String storageGroupName, TsFileManager tsFileManager, long timePartition, List<TsFileResource> sourceSeqFiles, List<TsFileResource> targetFiles) throws IOException {
-    List<TsFileResource> timePartitionSeqFiles = tsFileManager.getCopyOfSequenceListByTimePartition(timePartition);
+  default boolean validateTsFileResources(
+      String storageGroupName,
+      TsFileManager tsFileManager,
+      long timePartition,
+      List<TsFileResource> sourceSeqFiles,
+      List<TsFileResource> targetFiles)
+      throws IOException {
+    List<TsFileResource> timePartitionSeqFiles =
+        tsFileManager.getCopyOfSequenceListByTimePartition(timePartition);
     timePartitionSeqFiles.removeAll(sourceSeqFiles);
     timePartitionSeqFiles.addAll(targetFiles);
 
@@ -87,8 +103,8 @@ public interface CompactionValidator {
                   Long.parseLong(f2.getTsFile().getName().split("-")[0]));
           return timeDiff == 0
               ? Long.compareUnsigned(
-              Long.parseLong(f1.getTsFile().getName().split("-")[1]),
-              Long.parseLong(f2.getTsFile().getName().split("-")[1]))
+                  Long.parseLong(f1.getTsFile().getName().split("-")[1]),
+                  Long.parseLong(f2.getTsFile().getName().split("-")[1]))
               : timeDiff;
         });
     // deviceID -> <TsFileResource, last end time>

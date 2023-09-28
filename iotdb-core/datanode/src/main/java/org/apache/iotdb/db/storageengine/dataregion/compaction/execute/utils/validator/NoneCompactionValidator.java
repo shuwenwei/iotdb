@@ -22,7 +22,6 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.va
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 
-import java.io.IOException;
 import java.util.List;
 
 @SuppressWarnings("squid:S6548")
@@ -31,7 +30,15 @@ public class NoneCompactionValidator implements CompactionValidator {
   private NoneCompactionValidator() {}
 
   @Override
-  public boolean validateCompaction(String storageGroupName, TsFileManager manager, long timePartition, List<TsFileResource> sourceSeqTsFileList, List<TsFileResource> sourceUnSeqFileList, List<TsFileResource> targetTsFileList, boolean isInnerUnSequenceSpaceTask, boolean isInPlaceCrossSpaceCompaction) {
+  public boolean validateCompaction(
+      String storageGroupName,
+      TsFileManager manager,
+      long timePartition,
+      List<TsFileResource> sourceSeqTsFileList,
+      List<TsFileResource> sourceUnSeqFileList,
+      List<TsFileResource> targetTsFileList,
+      boolean isInnerUnSequenceSpaceTask,
+      boolean isInPlaceCrossSpaceCompaction) {
     return true;
   }
 

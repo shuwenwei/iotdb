@@ -141,8 +141,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
               true,
               new ReadChunkCompactionPerformer(),
               new AtomicInteger(0),
-              0
-          );
+              0);
       CompactionTaskManager.getInstance().addTaskToWaitingQueue(task);
     }
     for (TsFileResource resource : resources) {
@@ -237,7 +236,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             0,
             0);
     task.checkValidAndSetMerging();
-    task.start();
+    Assert.assertTrue(task.start());
 
     System.out.println();
   }

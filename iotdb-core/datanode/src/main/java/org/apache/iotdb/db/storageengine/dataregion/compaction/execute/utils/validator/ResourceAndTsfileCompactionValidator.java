@@ -35,9 +35,19 @@ public class ResourceAndTsfileCompactionValidator implements CompactionValidator
   }
 
   @Override
-  public boolean validateCompaction(String storageGroupName, TsFileManager manager, long timePartition, List<TsFileResource> sourceSeqTsFileList, List<TsFileResource> sourceUnSeqFileList, List<TsFileResource> targetTsFileList, boolean isInnerUnSequenceSpaceTask, boolean isInPlaceCrossSpaceCompaction) throws IOException {
+  public boolean validateCompaction(
+      String storageGroupName,
+      TsFileManager manager,
+      long timePartition,
+      List<TsFileResource> sourceSeqTsFileList,
+      List<TsFileResource> sourceUnSeqFileList,
+      List<TsFileResource> targetTsFileList,
+      boolean isInnerUnSequenceSpaceTask,
+      boolean isInPlaceCrossSpaceCompaction)
+      throws IOException {
     if (!isInnerUnSequenceSpaceTask) {
-      if (!validateTsFileResources(storageGroupName, manager, timePartition, sourceSeqTsFileList, targetTsFileList)) {
+      if (!validateTsFileResources(
+          storageGroupName, manager, timePartition, sourceSeqTsFileList, targetTsFileList)) {
         return false;
       }
     }

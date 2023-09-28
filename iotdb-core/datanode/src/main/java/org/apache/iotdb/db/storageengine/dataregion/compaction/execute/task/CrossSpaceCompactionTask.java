@@ -167,7 +167,15 @@ public class CrossSpaceCompactionTask extends AbstractCompactionTask {
             selectedSequenceFiles, selectedUnsequenceFiles, targetTsfileResourceList);
 
         CompactionValidator validator = CompactionValidator.getInstance();
-        if (!validator.validateCompaction(storageGroupName, tsFileManager, timePartition, seqTsFileResourceList, unseqTsFileResourceList, targetTsfileResourceList, false, false)) {
+        if (!validator.validateCompaction(
+            storageGroupName,
+            tsFileManager,
+            timePartition,
+            seqTsFileResourceList,
+            unseqTsFileResourceList,
+            targetTsfileResourceList,
+            false,
+            false)) {
           LOGGER.error(
               "Failed to pass compaction validation, "
                   + "source sequence files is: {}, "
