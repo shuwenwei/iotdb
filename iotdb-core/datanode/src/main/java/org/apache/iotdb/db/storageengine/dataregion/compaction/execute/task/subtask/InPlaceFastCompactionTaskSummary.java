@@ -20,6 +20,40 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask;
 
 public class InPlaceFastCompactionTaskSummary extends FastCompactionTaskSummary {
-  protected int rewriteChunkGroupNum = 0;
-  protected int splitMetadataSize = 0;
+  private int chunkGroupNoneOverlap = 0;
+  private int rewriteChunkGroupNum = 0;
+  private long splitMetadataSize = 0;
+
+  public void setChunkGroupNoneOverlap(int chunkGroupNoneOverlap) {
+    this.chunkGroupNoneOverlap = chunkGroupNoneOverlap;
+  }
+
+  public void setRewriteChunkGroupNum(int rewriteChunkGroupNum) {
+    this.rewriteChunkGroupNum = rewriteChunkGroupNum;
+  }
+
+  public void setSplitMetadataSize(long splitMetadataSize) {
+    this.splitMetadataSize = splitMetadataSize;
+  }
+
+  @Override
+  public String toString() {
+    return String.format(
+        "CHUNK_GROUP_NONE_OVERLAP num is %d, CHUNK_GROUP_OVERLAP num is %d"
+            + " CHUNK_NONE_OVERLAP num is %d, CHUNK_NONE_OVERLAP_BUT_DESERIALIZE num is %d,"
+            + " CHUNK_OVERLAP_OR_MODIFIED num is %d, PAGE_NONE_OVERLAP num is %d,"
+            + " PAGE_NONE_OVERLAP_BUT_DESERIALIZE num is %d, PAGE_OVERLAP_OR_MODIFIED num is %d,"
+            + " PAGE_FAKE_OVERLAP num is %d."
+            + " SPLIT_METADATA_SIZE is %d.",
+        chunkGroupNoneOverlap,
+        rewriteChunkGroupNum,
+        chunkNoneOverlap,
+        chunkNoneOverlapButDeserialize,
+        chunkOverlapOrModified,
+        pageNoneOverlap,
+        pageNoneOverlapButDeserialize,
+        pageOverlapOrModified,
+        pageFakeOverlap,
+        splitMetadataSize);
+  }
 }

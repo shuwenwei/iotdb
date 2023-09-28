@@ -31,6 +31,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.FastCompactionTaskSummary;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.InPlaceFastCompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.CompactionLogger;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.validator.CompactionValidator;
@@ -109,13 +110,16 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCompactionTask {
         selectedUnsequenceFiles.stream()
             .map(InPlaceCompactionUnSeqFile::new)
             .collect(Collectors.toList());
-    this.summary = new FastCompactionTaskSummary();
+    this.summary = new InPlaceFastCompactionTaskSummary();
   }
 
   private void initSeqFileInfo() throws IOException {
+    long splitMetadataSize = 0;
     for (InPlaceCompactionSeqFile inPlaceCompactionFile : inPlaceCompactionSeqFiles) {
       inPlaceCompactionFile.analyzeFile();
+      splitMetadataSize += inPlaceCompactionFile.getMetadataSize();
     }
+    ((InPlaceFastCompactionTaskSummary) summary).setSplitMetadataSize(splitMetadataSize);
   }
 
   @Override

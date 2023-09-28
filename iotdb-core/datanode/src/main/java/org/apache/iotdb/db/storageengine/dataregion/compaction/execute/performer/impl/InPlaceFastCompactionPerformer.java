@@ -27,6 +27,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.FastCompactionPerformerSubTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.FastCompactionTaskSummary;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.InPlaceFastCompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.MultiTsFileDeviceIterator;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.writer.AbstractCompactionWriter;
@@ -67,13 +68,13 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
   private List<TsFileResource> seqFiles;
   private List<TsFileResource> unseqFiles;
   private List<TsFileResource> targetFiles;
-  private FastCompactionTaskSummary subTaskSummary;
+  private InPlaceFastCompactionTaskSummary subTaskSummary;
   private static final int SUB_TASK_NUM =
       IoTDBDescriptor.getInstance().getConfig().getSubCompactionTaskNum();
-  private final Map<TsFileResource, List<Modification>> modificationCache;
+  private Map<TsFileResource, List<Modification>> modificationCache;
   private final Map<TsFileResource, Set<String>> rewriteDevices;
-  private final Map<TsFileResource, DeviceTimeIndex> deviceTimeIndexMap;
-  private final Map<TsFileResource, TsFileSequenceReader> readerCacheMap;
+  private Map<TsFileResource, DeviceTimeIndex> deviceTimeIndexMap;
+  private Map<TsFileResource, TsFileSequenceReader> readerCacheMap;
 
   public InPlaceFastCompactionPerformer() {
     this.modificationCache = new ConcurrentHashMap<>();
@@ -91,6 +92,8 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
 
     initReaderCacheMap();
 
+    int chunkGroupOverlapNum = 0;
+    int chunkGroupNonOverlapNum = 0;
     try (MultiTsFileDeviceIterator deviceIterator =
         new MultiTsFileDeviceIterator(seqFiles, unseqFiles, readerCacheMap)) {
       InPlaceCrossCompactionWriter compactionWriter =
@@ -121,6 +124,7 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
         if (sortedUnseqFilesOfCurrentDevice.isEmpty()) {
           // todo: update chunkMetadata
           copyDeviceChunkMetadata(compactionWriter, sortedSeqFilesOfCurrentDevice, device);
+          chunkGroupNonOverlapNum += sortedSeqFilesOfCurrentDevice.size();
           compactionWriter.endChunkGroup();
           // check whether to flush chunk metadata or not
           compactionWriter.checkAndMayFlushChunkMetadata();
@@ -140,6 +144,7 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
           if (sortedSeqFilesOfCurrentDevice.size() != selectedSourceFiles.size()) {
             sortedSeqFilesOfCurrentDevice.removeAll(selectedSourceFiles);
             copyDeviceChunkMetadata(compactionWriter, sortedSeqFilesOfCurrentDevice, device);
+            chunkGroupNonOverlapNum += sortedSeqFilesOfCurrentDevice.size();
           }
           for (TsFileResource selectedSourceFile : selectedSourceFiles) {
             Set<String> rewriteDeviceOfCurrentFile =
@@ -160,6 +165,7 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
         } else {
           compactNonAlignedSeries(device, deviceIterator, compactionWriter, sortedSourceFiles);
         }
+        chunkGroupOverlapNum += sortedSourceFiles.size();
 
         compactionWriter.endChunkGroup();
         // check whether to flush chunk metadata or not
@@ -169,11 +175,12 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
       }
       compactionWriter.endFile();
       CompactionUtils.updatePlanIndexes(targetFiles, seqFiles, unseqFiles);
-    } catch (Exception e) {
-      // todo
-      e.printStackTrace();
+      subTaskSummary.setChunkGroupNoneOverlap(chunkGroupNonOverlapNum);
+      subTaskSummary.setRewriteChunkGroupNum(chunkGroupOverlapNum);
     } finally {
-      // todo
+      this.modificationCache = null;
+      this.deviceTimeIndexMap = null;
+      this.readerCacheMap = null;
     }
   }
 
@@ -216,6 +223,7 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
         compactionWriter.writeChunkMetadataList(resource, measurementChunkMetadataList.getValue());
       }
     }
+
   }
 
   public Set<TsFileResource> selectSeqFilesToCompact(
@@ -357,12 +365,12 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
 
   @Override
   public void setSummary(CompactionTaskSummary summary) {
-    if (!(summary instanceof FastCompactionTaskSummary)) {
+    if (!(summary instanceof InPlaceFastCompactionTaskSummary)) {
       throw new IllegalCompactionTaskSummaryException(
           "CompactionTaskSummary for FastCompactionPerformer "
-              + "should be FastCompactionTaskSummary");
+              + "should be InPlaceFastCompactionTaskSummary");
     }
-    this.subTaskSummary = (FastCompactionTaskSummary) summary;
+    this.subTaskSummary = (InPlaceFastCompactionTaskSummary) summary;
   }
 
   @Override
