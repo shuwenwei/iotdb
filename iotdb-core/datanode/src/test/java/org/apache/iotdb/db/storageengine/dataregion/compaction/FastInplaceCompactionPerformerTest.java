@@ -1,7 +1,9 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction;
 
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.ReadChunkCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InnerSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.CompactionTaskManager;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.utils.CompactionTestFileWriter;
@@ -17,11 +19,14 @@ import org.apache.iotdb.tsfile.read.common.TimeRange;
 import org.apache.iotdb.tsfile.read.common.block.TsBlock;
 import org.apache.iotdb.tsfile.read.reader.chunk.ChunkReader;
 
+import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -119,6 +124,36 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
   }
 
   @Test
+  public void test() throws InterruptedException {
+    CompactionTaskManager.getInstance().start();
+    List<TsFileResource> resources = new ArrayList<>();
+    for (int i = 0; i < 151; i++) {
+      File f = new File(i + "-" + "i" + "-0-0.tsfile");
+      TsFileResource resource = new TsFileResource();
+      resources.add(resource);
+      resource.setFile(f);
+      resource.setStatusForTest(TsFileResourceStatus.NORMAL);
+      AbstractCompactionTask task =
+          new InnerSpaceCompactionTask(
+              0,
+              tsFileManager,
+              Arrays.asList(resource),
+              true,
+              new ReadChunkCompactionPerformer(),
+              new AtomicInteger(0),
+              0
+          );
+      CompactionTaskManager.getInstance().addTaskToWaitingQueue(task);
+    }
+    for (TsFileResource resource : resources) {
+      if (resource.getStatus() == TsFileResourceStatus.NORMAL) {
+        return;
+      }
+    }
+    Assert.fail();
+  }
+
+  @Test
   public void test1() throws IOException {
     List<TsFileResource> seqFiles = new ArrayList<>();
 
@@ -131,6 +166,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             TSEncoding.PLAIN,
             CompressionType.LZ4,
             true);
+    seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
     TsFileResource seqResource2 =
         generateSingleNonAlignedSeriesFile(
             "d1",
@@ -139,6 +175,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             TSEncoding.PLAIN,
             CompressionType.LZ4,
             true);
+    seqResource2.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
 
     TsFileResource seqResource3 =
         generateSingleNonAlignedSeriesFile(
@@ -148,6 +185,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             TSEncoding.PLAIN,
             CompressionType.LZ4,
             true);
+    seqResource3.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
 
     TsFileResource unseqResource1 =
         generateSingleNonAlignedSeriesFile(
@@ -157,6 +195,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             TSEncoding.PLAIN,
             CompressionType.LZ4,
             false);
+    unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
 
     TsFileResource unseqResource2 =
         generateSingleNonAlignedSeriesFile(
@@ -166,6 +205,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             TSEncoding.PLAIN,
             CompressionType.LZ4,
             false);
+    unseqResource2.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
 
     TsFileResource unseqResource3 =
         generateSingleNonAlignedSeriesFile(
@@ -175,6 +215,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             TSEncoding.PLAIN,
             CompressionType.LZ4,
             false);
+    unseqResource3.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
 
     seqFiles.add(seqResource1);
     seqFiles.add(seqResource2);
@@ -184,17 +225,19 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     unseqFiles.add(unseqResource3);
 
     CompactionTaskManager.getInstance().start();
-    //    AbstractCompactionTask task =
-    //        new InplaceCrossSpaceCompactionTask(
-    //            0,
-    //            tsFileManager,
-    //            seqFiles,
-    //            unseqFiles,
-    //            new FastDeviceCompactionPerformer(),
-    //            new AtomicInteger(0),
-    //            0,
-    //            0);
-    //    task.start();start
+
+    AbstractCompactionTask task =
+        new InPlaceCrossSpaceCompactionTask(
+            0,
+            tsFileManager,
+            seqFiles,
+            unseqFiles,
+            new InPlaceFastCompactionPerformer(),
+            new AtomicInteger(0),
+            0,
+            0);
+    task.checkValidAndSetMerging();
+    task.start();
 
     System.out.println();
   }

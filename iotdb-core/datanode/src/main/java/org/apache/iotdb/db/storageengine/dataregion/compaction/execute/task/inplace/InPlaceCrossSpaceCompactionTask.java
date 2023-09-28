@@ -199,6 +199,12 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCompactionTask {
         }
       }
       // <<< 重置原始文件
+      // 删除合并日志文件
+      try {
+        Files.deleteIfExists(logFile.toPath());
+      } catch (IOException e) {
+        LOGGER.error("Failed to delete compaction log file");
+      }
     }
   }
 

@@ -172,7 +172,12 @@ public class CompactionUtils {
     for (int i = 0; i < seqResources.size(); i++) {
       TsFileResource seqFile = seqResources.get(i);
       Set<Modification> seqModifications =
-          new HashSet<>(ModificationFile.getCompactionMods(seqResources.get(i)).getModifications());
+          new HashSet<>(ModificationFile.getNormalMods(seqResources.get(i)).getModifications());
+      long dataSizeBeforeCompaction = dataSizeOfSeqFilesBeforeCompaction.get(i);
+      for (Modification seqModification : seqModifications) {
+        long newOffset = Math.min(dataSizeBeforeCompaction, seqModification.getFileOffset());
+        seqModification.setFileOffset(newOffset);
+      }
       seqModifications.addAll(modifications);
       Set<String> rewriteDevices =
           rewriteDeviceOfSeqFiles.getOrDefault(seqFile, Collections.emptySet());
