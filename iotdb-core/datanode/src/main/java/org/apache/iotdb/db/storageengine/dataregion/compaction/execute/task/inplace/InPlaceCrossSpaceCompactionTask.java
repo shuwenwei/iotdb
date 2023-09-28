@@ -24,6 +24,7 @@ import org.apache.iotdb.db.service.metrics.CompactionMetrics;
 import org.apache.iotdb.db.service.metrics.FileMetrics;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionFileCountExceededException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionMemoryNotEnoughException;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionValidationFailedException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.InPlaceCompactionCleanupException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.InPlaceCompactionErrorException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICrossCompactionPerformer;
@@ -32,6 +33,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.Abst
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.FastCompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.CompactionLogger;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.validator.CompactionValidator;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceList;
@@ -147,7 +149,11 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCompactionTask {
       // 这个步骤如果发生了异常，需要进行文件恢复的内容包括：1. seqFile; 2. target resource, 3. 新产生的 mods、resource
       prepareAdjuvantFilesOfTargetResources();
 
-      // TODO modify current CompactionValidator to support InPlaceCompaction validation
+      // 对目标文件进行重叠验证和文件正确性验证
+      CompactionValidator validator = CompactionValidator.getInstance();
+      if (!validator.validateCompaction(storageGroupName, tsFileManager, timePartition, selectedSequenceFiles, selectedUnsequenceFiles, targetFiles, false, true)) {
+        throw new CompactionValidationFailedException("Failed to pass compaction validation");
+      }
 
       atomicReplace();
 
@@ -177,6 +183,16 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     } catch (InPlaceCompactionCleanupException e) {
       tsFileManager.setAllowCompaction(false); // 考虑是否需要在这一步进行设定？
       LOGGER.error("fetal error. InPlaceCompaction error when doing cleanup work", e);
+      return false;
+    } catch (CompactionValidationFailedException e) {
+      LOGGER.error(
+          "Failed to pass compaction validation, "
+              + "source sequence files is: {}, "
+              + "unsequence files is {}, "
+              + "target files is {}",
+          selectedSequenceFiles,
+          selectedUnsequenceFiles,
+          targetFiles);
       return false;
     } finally {
       // >>> 系统资源释放

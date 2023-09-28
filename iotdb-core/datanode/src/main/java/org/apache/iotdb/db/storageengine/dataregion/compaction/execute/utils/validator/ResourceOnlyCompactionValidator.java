@@ -19,11 +19,12 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.validator;
 
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
+import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceList;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 @SuppressWarnings("squid:S6548")
@@ -36,17 +37,11 @@ public class ResourceOnlyCompactionValidator implements CompactionValidator {
   }
 
   @Override
-  public boolean validateCompaction(
-      TsFileManager manager,
-      List<TsFileResource> targetTsFileList,
-      String storageGroupName,
-      long timePartition,
-      boolean isInnerUnSequenceSpaceTask)
-      throws IOException {
-    if (isInnerUnSequenceSpaceTask) {
+  public boolean validateCompaction(String storageGroupName, TsFileManager manager, long timePartition, List<TsFileResource> sourceSeqTsFileList, List<TsFileResource> sourceUnSeqFileList, List<TsFileResource> targetTsFileList, boolean isInnerUnSequenceSpaceTask, boolean isInPlaceCrossSpaceCompaction) throws IOException {
+    if (isInPlaceCrossSpaceCompaction) {
       return true;
     }
-    return CompactionUtils.validateTsFileResources(manager, storageGroupName, timePartition);
+    return validateTsFileResources(storageGroupName, manager, timePartition, sourceSeqTsFileList, targetTsFileList);
   }
 
   private static class ResourceOnlyCompactionValidatorHolder {

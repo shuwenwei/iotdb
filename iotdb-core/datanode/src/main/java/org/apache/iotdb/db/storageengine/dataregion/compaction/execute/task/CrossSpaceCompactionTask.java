@@ -166,6 +166,19 @@ public class CrossSpaceCompactionTask extends AbstractCompactionTask {
         CompactionUtils.combineModsInCrossCompaction(
             selectedSequenceFiles, selectedUnsequenceFiles, targetTsfileResourceList);
 
+        CompactionValidator validator = CompactionValidator.getInstance();
+        if (!validator.validateCompaction(storageGroupName, tsFileManager, timePartition, seqTsFileResourceList, unseqTsFileResourceList, targetTsfileResourceList, false, false)) {
+          LOGGER.error(
+              "Failed to pass compaction validation, "
+                  + "source sequence files is: {}, "
+                  + "unsequence files is {}, "
+                  + "target files is {}",
+              selectedSequenceFiles,
+              selectedUnsequenceFiles,
+              targetTsfileResourceList);
+          throw new CompactionValidationFailedException("Failed to pass compaction validation");
+        }
+
         // update tsfile resource in memory
         tsFileManager.replace(
             selectedSequenceFiles,
@@ -179,20 +192,6 @@ public class CrossSpaceCompactionTask extends AbstractCompactionTask {
           if (targetResource.isDeleted()) {
             compactionLogger.logFile(targetResource, CompactionLogger.STR_DELETED_TARGET_FILES);
           }
-        }
-
-        CompactionValidator validator = CompactionValidator.getInstance();
-        if (!validator.validateCompaction(
-            tsFileManager, targetTsfileResourceList, storageGroupName, timePartition, false)) {
-          LOGGER.error(
-              "Failed to pass compaction validation, "
-                  + "source sequence files is: {}, "
-                  + "unsequence files is {}, "
-                  + "target files is {}",
-              selectedSequenceFiles,
-              selectedUnsequenceFiles,
-              targetTsfileResourceList);
-          throw new CompactionValidationFailedException("Failed to pass compaction validation");
         }
 
         releaseReadAndLockWrite(selectedSequenceFiles);

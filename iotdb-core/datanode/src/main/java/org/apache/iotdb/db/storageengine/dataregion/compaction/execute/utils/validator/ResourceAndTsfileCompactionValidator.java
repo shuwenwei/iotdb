@@ -19,7 +19,6 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.validator;
 
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 
@@ -36,18 +35,17 @@ public class ResourceAndTsfileCompactionValidator implements CompactionValidator
   }
 
   @Override
-  public boolean validateCompaction(
-      TsFileManager manager,
-      List<TsFileResource> targetTsFileList,
-      String storageGroupName,
-      long timePartition,
-      boolean isInnerUnSequenceSpaceTask)
-      throws IOException {
-    if (isInnerUnSequenceSpaceTask) {
-      return CompactionUtils.validateTsFiles(targetTsFileList);
+  public boolean validateCompaction(String storageGroupName, TsFileManager manager, long timePartition, List<TsFileResource> sourceSeqTsFileList, List<TsFileResource> sourceUnSeqFileList, List<TsFileResource> targetTsFileList, boolean isInnerUnSequenceSpaceTask, boolean isInPlaceCrossSpaceCompaction) throws IOException {
+    if (!isInnerUnSequenceSpaceTask) {
+      if (!validateTsFileResources(storageGroupName, manager, timePartition, sourceSeqTsFileList, targetTsFileList)) {
+        return false;
+      }
     }
-    return CompactionUtils.validateTsFileResources(manager, storageGroupName, timePartition)
-        && CompactionUtils.validateTsFiles(targetTsFileList);
+    if (isInPlaceCrossSpaceCompaction) {
+      return validateTsFiles(sourceSeqTsFileList);
+    } else {
+      return validateTsFiles(targetTsFileList);
+    }
   }
 
   private static class ResourceAndTsfileCompactionValidatorHolder {

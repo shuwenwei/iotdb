@@ -191,6 +191,15 @@ public class InnerSpaceCompactionTask extends AbstractCompactionTask {
               String.format("%s-%s [Compaction] abort", storageGroupName, dataRegionId));
         }
 
+        CompactionValidator validator = CompactionValidator.getInstance();
+        if (!validator.validateCompaction(storageGroupName, tsFileManager, timePartition, sequence ? selectedTsFileResourceList : Collections.emptyList(), !sequence ? selectedTsFileResourceList : Collections.emptyList(), targetTsFileList, !sequence, false)) {
+          LOGGER.error(
+              "Failed to pass compaction validation, source files is: {}, target files is {}",
+              selectedTsFileResourceList,
+              targetTsFileList);
+          throw new CompactionValidationFailedException("Failed to pass compaction validation");
+        }
+
         // replace the old files with new file, the new is in same position as the old
         if (sequence) {
           tsFileManager.replace(
@@ -212,15 +221,6 @@ public class InnerSpaceCompactionTask extends AbstractCompactionTask {
           compactionLogger.logFile(targetTsFileResource, CompactionLogger.STR_DELETED_TARGET_FILES);
         }
 
-        CompactionValidator validator = CompactionValidator.getInstance();
-        if (!validator.validateCompaction(
-            tsFileManager, targetTsFileList, storageGroupName, timePartition, !sequence)) {
-          LOGGER.error(
-              "Failed to pass compaction validation, source files is: {}, target files is {}",
-              selectedTsFileResourceList,
-              targetTsFileList);
-          throw new CompactionValidationFailedException("Failed to pass compaction validation");
-        }
 
         LOGGER.info(
             "{}-{} [Compaction] Compacted target files, try to get the write lock of source files",
