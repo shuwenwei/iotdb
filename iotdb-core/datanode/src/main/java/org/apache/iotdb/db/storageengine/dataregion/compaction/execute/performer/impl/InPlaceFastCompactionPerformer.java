@@ -223,7 +223,6 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
         compactionWriter.writeChunkMetadataList(resource, measurementChunkMetadataList.getValue());
       }
     }
-
   }
 
   public Set<TsFileResource> selectSeqFilesToCompact(

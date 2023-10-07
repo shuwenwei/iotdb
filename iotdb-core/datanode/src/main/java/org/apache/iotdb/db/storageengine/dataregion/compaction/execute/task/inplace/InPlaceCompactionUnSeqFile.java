@@ -45,7 +45,9 @@ public class InPlaceCompactionUnSeqFile extends InPlaceCompactionFile {
   }
 
   @Override
-  public void releaseResourceAndResetStatus() throws IOException {
+  public void releaseResourceAndResetStatus() {
+    // If the status of the TsFileResource is DELETED, this
+    // method will fail
     tsFileResource.setStatus(TsFileResourceStatus.NORMAL);
     releaseLock();
   }

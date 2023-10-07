@@ -276,7 +276,7 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCompactionTask {
     TsFileResourceList seqListReference =
         tsFileManager.getOrCreateSequenceListByTimePartition(timePartition);
     TsFileResourceList unSeqListReference =
-        tsFileManager.getOrCreateSequenceListByTimePartition(timePartition);
+        tsFileManager.getOrCreateUnsequenceListByTimePartition(timePartition);
     tsFileManager.writeLock("InPlaceCompaction");
     try {
       for (TsFileResource resource : selectedSequenceFiles) {

@@ -23,8 +23,9 @@ import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.db.conf.IoTDBConfig;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICompactionPerformer;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CrossSpaceCompactionTask;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InnerSpaceCompactionTask;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.ICompactionSelector;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.ICrossSpaceSelector;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.utils.CrossCompactionTaskResource;
@@ -162,15 +163,12 @@ public class CompactionScheduler {
     for (int i = 0, size = taskList.size(); i < size; ++i) {
       if (CompactionTaskManager.getInstance()
           .addTaskToWaitingQueue(
-              new CrossSpaceCompactionTask(
+              new InPlaceCrossSpaceCompactionTask(
                   timePartition,
                   tsFileManager,
                   taskList.get(i).getSeqFiles(),
                   taskList.get(i).getUnseqFiles(),
-                  IoTDBDescriptor.getInstance()
-                      .getConfig()
-                      .getCrossCompactionPerformer()
-                      .createInstance(),
+                  new InPlaceFastCompactionPerformer(),
                   CompactionTaskManager.currentTaskNum,
                   memoryCost.get(i),
                   tsFileManager.getNextCompactionTaskId()))) {

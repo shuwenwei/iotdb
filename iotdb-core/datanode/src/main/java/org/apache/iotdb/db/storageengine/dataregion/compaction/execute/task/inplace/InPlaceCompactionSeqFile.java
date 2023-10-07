@@ -129,6 +129,8 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
 
   @Override
   public void releaseResourceAndResetStatus() throws IOException {
+    // If the status of the TsFileResource is DELETED, this
+    // method will fail
     tsFileResource.setStatus(TsFileResourceStatus.NORMAL);
     releaseLock();
     if (tsFileChannel != null) {
