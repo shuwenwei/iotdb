@@ -20,7 +20,7 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.comparator;
 
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CrossSpaceCompactionTask;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InnerSpaceCompactionTask;
 
 import java.util.Comparator;
@@ -32,5 +32,5 @@ public interface ICompactionTaskComparator extends Comparator<AbstractCompaction
       InnerSpaceCompactionTask task1, InnerSpaceCompactionTask task2);
 
   int compareCrossSpaceCompactionTask(
-      CrossSpaceCompactionTask task1, CrossSpaceCompactionTask task2);
+      AbstractCrossSpaceCompactionTask task1, AbstractCrossSpaceCompactionTask task2);
 }

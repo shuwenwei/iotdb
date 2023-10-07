@@ -30,7 +30,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICrossCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.FastCompactionTaskSummary;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.InPlaceFastCompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.CompactionLogger;
@@ -57,17 +57,12 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-public class InPlaceCrossSpaceCompactionTask extends AbstractCompactionTask {
+public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
   private static final Logger LOGGER =
       LoggerFactory.getLogger(IoTDBConstant.COMPACTION_LOGGER_NAME);
   private final List<InPlaceCompactionSeqFile> inPlaceCompactionSeqFiles;
   private final List<InPlaceCompactionUnSeqFile> inPlaceCompactionUnSeqFiles;
-  private final List<TsFileResource> selectedSequenceFiles;
-  private final List<TsFileResource> selectedUnsequenceFiles;
   private final List<TsFileResource> targetFiles;
-  private final long memoryCost;
-  private double selectedSeqFileSize;
-  private double selectedUnseqFileSize;
 
   public InPlaceCrossSpaceCompactionTask(
       long timePartition,
@@ -79,20 +74,14 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCompactionTask {
       long memoryCost,
       long serialId) {
     super(
-        tsFileManager.getStorageGroupName(),
-        tsFileManager.getDataRegionId(),
         timePartition,
         tsFileManager,
+        selectedSequenceFiles,
+        selectedUnsequenceFiles,
+        performer,
         currentTaskNum,
+        memoryCost,
         serialId);
-    this.selectedSequenceFiles = selectedSequenceFiles;
-    for (TsFileResource resource : selectedSequenceFiles) {
-      this.selectedSeqFileSize += resource.getTsFileSize();
-    }
-    this.selectedUnsequenceFiles = selectedUnsequenceFiles;
-    for (TsFileResource resource : selectedUnsequenceFiles) {
-      this.selectedUnseqFileSize += resource.getTsFileSize();
-    }
     // generate a copy of all source seq TsFileResource in memory
     this.targetFiles =
         selectedSequenceFiles.stream()
@@ -120,15 +109,6 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCompactionTask {
       splitMetadataSize += inPlaceCompactionFile.getMetadataSize();
     }
     ((InPlaceFastCompactionTaskSummary) summary).setSplitMetadataSize(splitMetadataSize);
-  }
-
-  @Override
-  protected List<TsFileResource> getAllSourceTsFiles() {
-    List<TsFileResource> allSourceTsFiles =
-        new ArrayList<>(selectedSequenceFiles.size() + selectedUnsequenceFiles.size());
-    allSourceTsFiles.addAll(selectedSequenceFiles);
-    allSourceTsFiles.addAll(selectedUnsequenceFiles);
-    return allSourceTsFiles;
   }
 
   @Override
@@ -535,6 +515,6 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCompactionTask {
 
   @Override
   protected void createSummary() {
-    summary = new FastCompactionTaskSummary();
+    this.summary = new InPlaceFastCompactionTaskSummary();
   }
 }

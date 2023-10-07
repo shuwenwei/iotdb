@@ -49,19 +49,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class CrossSpaceCompactionTask extends AbstractCompactionTask {
+public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
   protected static final Logger LOGGER =
       LoggerFactory.getLogger(IoTDBConstant.COMPACTION_LOGGER_NAME);
-  protected List<TsFileResource> selectedSequenceFiles;
-  protected List<TsFileResource> selectedUnsequenceFiles;
   protected TsFileResourceList seqTsFileResourceList;
   protected TsFileResourceList unseqTsFileResourceList;
   protected File logFile;
   protected List<TsFileResource> targetTsfileResourceList;
   protected List<TsFileResource> holdReadLockList = new ArrayList<>();
   protected List<TsFileResource> holdWriteLockList = new ArrayList<>();
-  protected double selectedSeqFileSize = 0;
-  protected double selectedUnseqFileSize = 0;
 
   @SuppressWarnings("squid:S107")
   public CrossSpaceCompactionTask(
@@ -74,24 +70,18 @@ public class CrossSpaceCompactionTask extends AbstractCompactionTask {
       long memoryCost,
       long serialId) {
     super(
-        tsFileManager.getStorageGroupName(),
-        tsFileManager.getDataRegionId(),
         timePartition,
         tsFileManager,
+        selectedSequenceFiles,
+        selectedUnsequenceFiles,
+        performer,
         currentTaskNum,
+        memoryCost,
         serialId);
-    this.selectedSequenceFiles = selectedSequenceFiles;
-    this.selectedUnsequenceFiles = selectedUnsequenceFiles;
     this.seqTsFileResourceList =
         tsFileManager.getOrCreateSequenceListByTimePartition(timePartition);
     this.unseqTsFileResourceList =
         tsFileManager.getOrCreateUnsequenceListByTimePartition(timePartition);
-    this.performer = performer;
-    this.hashCode = this.toString().hashCode();
-    this.memoryCost = memoryCost;
-    this.crossTask = true;
-    this.innerSeqTask = false;
-    createSummary();
   }
 
   @Override
@@ -114,14 +104,6 @@ public class CrossSpaceCompactionTask extends AbstractCompactionTask {
             storageGroupName,
             dataRegionId);
         return true;
-      }
-
-      for (TsFileResource resource : selectedSequenceFiles) {
-        selectedSeqFileSize += resource.getTsFileSize();
-      }
-
-      for (TsFileResource resource : selectedUnsequenceFiles) {
-        selectedUnseqFileSize += resource.getTsFileSize();
       }
 
       LOGGER.info(
@@ -314,49 +296,6 @@ public class CrossSpaceCompactionTask extends AbstractCompactionTask {
     }
     holdReadLockList.clear();
     holdWriteLockList.clear();
-  }
-
-  public List<TsFileResource> getSelectedSequenceFiles() {
-    return selectedSequenceFiles;
-  }
-
-  @Override
-  protected List<TsFileResource> getAllSourceTsFiles() {
-    List<TsFileResource> allRelatedFiles = new ArrayList<>();
-    allRelatedFiles.addAll(selectedSequenceFiles);
-    allRelatedFiles.addAll(selectedUnsequenceFiles);
-    return allRelatedFiles;
-  }
-
-  public List<TsFileResource> getSelectedUnsequenceFiles() {
-    return selectedUnsequenceFiles;
-  }
-
-  @Override
-  public String toString() {
-    return storageGroupName
-        + "-"
-        + dataRegionId
-        + "-"
-        + timePartition
-        + " task seq files are "
-        + selectedSequenceFiles.toString()
-        + " , unseq files are "
-        + selectedUnsequenceFiles.toString();
-  }
-
-  @Override
-  public int hashCode() {
-    return hashCode;
-  }
-
-  @Override
-  public boolean equals(Object other) {
-    if (!(other instanceof CrossSpaceCompactionTask)) {
-      return false;
-    }
-
-    return equalsOtherTask((CrossSpaceCompactionTask) other);
   }
 
   protected void releaseReadAndLockWrite(List<TsFileResource> tsFileResourceList) {

@@ -22,9 +22,8 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.compara
 import org.apache.iotdb.db.conf.IoTDBConfig;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CrossSpaceCompactionTask;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InnerSpaceCompactionTask;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.constant.CompactionPriority;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 
@@ -36,16 +35,13 @@ public class DefaultCompactionTaskComparatorImpl implements ICompactionTaskCompa
   @SuppressWarnings({"squid:S3776", "javabugs:S6320"})
   @Override
   public int compare(AbstractCompactionTask o1, AbstractCompactionTask o2) {
-    if (o1 instanceof InPlaceCrossSpaceCompactionTask
-        && o2 instanceof InPlaceCrossSpaceCompactionTask) {
-      return o1.getSerialId() < o2.getSerialId() ? -1 : 1;
-    }
-    if ((((o1 instanceof InnerSpaceCompactionTask) && (o2 instanceof CrossSpaceCompactionTask))
+    if ((((o1 instanceof InnerSpaceCompactionTask)
+            && (o2 instanceof AbstractCrossSpaceCompactionTask))
         || ((o2 instanceof InnerSpaceCompactionTask)
-            && (o1 instanceof CrossSpaceCompactionTask)))) {
+            && (o1 instanceof AbstractCrossSpaceCompactionTask)))) {
       if (config.getCompactionPriority() == CompactionPriority.CROSS_INNER) {
         // priority is CROSS_INNER
-        return o1 instanceof CrossSpaceCompactionTask ? -1 : 1;
+        return o1 instanceof AbstractCrossSpaceCompactionTask ? -1 : 1;
       } else if (config.getCompactionPriority() == CompactionPriority.INNER_CROSS) {
         // priority is INNER_CROSS
         return o1 instanceof InnerSpaceCompactionTask ? -1 : 1;
@@ -54,7 +50,7 @@ public class DefaultCompactionTaskComparatorImpl implements ICompactionTaskCompa
         if (o1.getSerialId() != o2.getSerialId()) {
           return o1.getSerialId() < o2.getSerialId() ? -1 : 1;
         } else {
-          return o1 instanceof CrossSpaceCompactionTask ? -1 : 1;
+          return o1 instanceof AbstractCrossSpaceCompactionTask ? -1 : 1;
         }
       }
     } else if (o1 instanceof InnerSpaceCompactionTask) {
@@ -62,7 +58,7 @@ public class DefaultCompactionTaskComparatorImpl implements ICompactionTaskCompa
           (InnerSpaceCompactionTask) o1, (InnerSpaceCompactionTask) o2);
     } else {
       return compareCrossSpaceCompactionTask(
-          (CrossSpaceCompactionTask) o1, (CrossSpaceCompactionTask) o2);
+          (AbstractCrossSpaceCompactionTask) o1, (AbstractCrossSpaceCompactionTask) o2);
     }
   }
 
@@ -124,7 +120,7 @@ public class DefaultCompactionTaskComparatorImpl implements ICompactionTaskCompa
   }
 
   public int compareCrossSpaceCompactionTask(
-      CrossSpaceCompactionTask o1, CrossSpaceCompactionTask o2) {
+      AbstractCrossSpaceCompactionTask o1, AbstractCrossSpaceCompactionTask o2) {
     // if the time partition of o1 and o2 are different
     // we prefer to execute task with greater time partition
     // because we want to compact files with new data
