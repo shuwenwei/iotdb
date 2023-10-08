@@ -83,8 +83,6 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
                 resource ->
                     new TsFileResource(resource.getTsFile(), TsFileResourceStatus.COMPACTING))
             .collect(Collectors.toList());
-    this.memoryCost = memoryCost;
-    this.performer = performer;
     this.inPlaceCompactionSeqFiles =
         selectedSequenceFiles.stream()
             .map(InPlaceCompactionSeqFile::new)
@@ -93,7 +91,6 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
         selectedUnsequenceFiles.stream()
             .map(InPlaceCompactionUnSeqFile::new)
             .collect(Collectors.toList());
-    this.summary = new InPlaceFastCompactionTaskSummary();
   }
 
   private void initSeqFileInfo() throws IOException {

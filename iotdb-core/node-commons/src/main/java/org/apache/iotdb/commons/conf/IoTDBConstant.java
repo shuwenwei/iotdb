@@ -262,6 +262,9 @@ public class IoTDBConstant {
   // cross space compaction
   public static final String CROSS_COMPACTION_TMP_FILE_SUFFIX = ".cross";
 
+  // in place cross space compaction temp metadata file
+  public static final String IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX = ".tail";
+
   // cross space compaction of previous version (<0.13)
   public static final String CROSS_COMPACTION_TMP_FILE_SUFFIX_FROM_OLD = ".merge";
 

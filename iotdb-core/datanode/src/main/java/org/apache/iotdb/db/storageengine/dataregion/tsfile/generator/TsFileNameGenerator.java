@@ -200,18 +200,6 @@ public class TsFileNameGenerator {
     return targetFileResources;
   }
 
-  public static List<TsFileResource> getInPlaceCrossCompactionTargetFileResources(
-      List<TsFileResource> seqResources) throws IOException {
-    List<TsFileResource> targetFileResources = new ArrayList<>();
-    for (TsFileResource resource : seqResources) {
-      // generate a copy of source seq TsFileResource to avoid modify source TsFileResource in
-      // compaction
-      targetFileResources.add(
-          new TsFileResource(resource.getTsFile(), TsFileResourceStatus.COMPACTING));
-    }
-    return targetFileResources;
-  }
-
   public static File getCrossSpaceCompactionTargetFile(
       TsFileResource seqTsFileResource, boolean isTempFile) throws IOException {
     TsFileName tsFileName = getTsFileName(seqTsFileResource.getTsFile().getName());

@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl;
 
+import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.commons.exception.IllegalPathException;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.exception.WriteProcessException;
@@ -193,7 +194,7 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
   private void initReaderCacheMap() throws IOException {
     for (TsFileResource resource : seqFiles) {
       File dataFile = resource.getTsFile();
-      File metadataFile = new File(dataFile.getAbsolutePath() + ".tail");
+      File metadataFile = new File(dataFile.getAbsolutePath() + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX);
 
       CompactingTsFileInput tsFileInput =
           new CompactingTsFileInput(dataFile.toPath(), metadataFile.toPath());

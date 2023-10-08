@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace;
 
+import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.InPlaceCompactionErrorException;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
@@ -169,7 +170,7 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
 
   public File getMetadataFile() {
     File dataFile = this.tsFileResource.getTsFile();
-    return new File(dataFile.getAbsolutePath() + ".tail");
+    return new File(dataFile.getAbsolutePath() + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX);
   }
 
   public FileChannel getTsFileChannel() throws IOException {
