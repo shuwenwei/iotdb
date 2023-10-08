@@ -60,7 +60,10 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     logger.info(
         "{} [Compaction][Recover] compaction log is {}", fullStorageGroupName, compactionLogFile);
     if (!compactionLogFile.exists()) {
-      logger.info("");
+      logger.error(
+            "{} [Compaction][Recover] compaction log file {} not exists, abort recover",
+            fullStorageGroupName,
+            compactionLogFile);
       return;
     }
     logger.info(
@@ -71,7 +74,10 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     try {
       logAnalyzer.analyzeInPlaceCrossSpaceCompactionLog();
     } catch (IOException e) {
-      logger.error("Failed to analyze log", e);
+      logger.error("{} [Compaction][Recover] failed to analyze compaction log file {}, abort recover. {}",
+          fullStorageGroupName,
+          compactionLogFile,
+          e);
       return;
     }
 
@@ -88,7 +94,10 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     try {
       recoverCompactionFiles(sourceFileIdentifiers, targetFileIdentifiers);
     } catch (CompactionRecoverException e) {
-      logger.error("", e);
+      logger.error("{} [Compaction][Recover] failed to recover compaction log file {}, abort recover. {}",
+          fullStorageGroupName,
+          compactionLogFile,
+          e);
       tsFileManager.setAllowCompaction(false);
       return;
     }
@@ -96,7 +105,10 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     try {
       Files.deleteIfExists(compactionLogFile.toPath());
     } catch (IOException e) {
-      logger.error("");
+      logger.error("{} [Compaction][Recover] failed to delete compaction log file {}. {}",
+          fullStorageGroupName,
+          compactionLogFile,
+          e);
     }
   }
 
@@ -129,8 +141,9 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
         existSeqFiles.size() + existUnSeqFiles.size() == sourceFileIdentifiers.size();
     boolean canRecover = existSeqFiles.size() + existTargetFileNum == sourceSeqFileNum;
     if (!canRecover) {
-      logger.error("Can not recover InPlaceCrossSpaceCompaction because some file is lost");
-
+      logger.error("{} [Compaction][Recover] Can not recover log file {} because some file is lost",
+          fullStorageGroupName,
+          compactionLogFile);
       return;
     }
 
@@ -155,13 +168,15 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
         seqFile.setMetadataSize(identifier.getMetadataSize());
         seqFile.revert();
       } catch (InPlaceCompactionErrorException e) {
-        throw new CompactionRecoverException("");
+        throw new CompactionRecoverException();
       } finally {
         if (seqFile != null) {
           try {
             seqFile.releaseResourceAndResetStatus();
           } catch (IOException e) {
-            logger.error("");
+            logger.error("{} [Compaction][Recover] Can not reset status of source file {}",
+                fullStorageGroupName,
+                seqFile);
           }
         }
       }
@@ -172,7 +187,7 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
       try {
         unSeqFile.revert();
       } catch (InPlaceCompactionErrorException e) {
-        logger.error("");
+        throw new CompactionRecoverException("Can not recover source unsequence file, " + unSeqFile);
       }
     }
     // remove target files
@@ -180,7 +195,10 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
       try {
         deleteResourceAndModsFile(identifier);
       } catch (IOException e) {
-        logger.error("");
+        logger.error("{} [Compaction][Recover] can not delete target file {}. {}",
+            fullStorageGroupName,
+            identifier.getFilePath(),
+            e);
       }
     }
   }
@@ -199,16 +217,19 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
         File targetFile = TsFileNameGenerator.getCrossSpaceCompactionTargetFile(resource, false);
         Files.move(resource.getTsFile().toPath(), targetFile.toPath());
 
-        resource.getCompactionModFile().remove();
-        resource.remove();
+        deleteResourceAndModsFile(resource);
       }
     } catch (IOException e) {
-      logger.error("");
+      throw new CompactionRecoverException("Can not recover compaction files", e);
     }
   }
 
   private void deleteResourceAndModsFile(TsFileIdentifier identifier) throws IOException {
     TsFileResource resource = getTsFileResource(identifier);
+    deleteResourceAndModsFile(resource);
+  }
+
+  private void deleteResourceAndModsFile(TsFileResource resource) throws IOException {
     // delete compaction mods file
     resource.getCompactionModFile().remove();
     // delete resource and mods file
