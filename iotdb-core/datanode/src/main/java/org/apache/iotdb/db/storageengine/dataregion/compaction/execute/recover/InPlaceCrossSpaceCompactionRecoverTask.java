@@ -61,9 +61,9 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
         "{} [Compaction][Recover] compaction log is {}", fullStorageGroupName, compactionLogFile);
     if (!compactionLogFile.exists()) {
       logger.error(
-            "{} [Compaction][Recover] compaction log file {} not exists, abort recover",
-            fullStorageGroupName,
-            compactionLogFile);
+          "{} [Compaction][Recover] compaction log file {} not exists, abort recover",
+          fullStorageGroupName,
+          compactionLogFile);
       return;
     }
     logger.info(
@@ -74,7 +74,8 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     try {
       logAnalyzer.analyzeInPlaceCrossSpaceCompactionLog();
     } catch (IOException e) {
-      logger.error("{} [Compaction][Recover] failed to analyze compaction log file {}, abort recover. {}",
+      logger.error(
+          "{} [Compaction][Recover] failed to analyze compaction log file {}, abort recover",
           fullStorageGroupName,
           compactionLogFile,
           e);
@@ -94,7 +95,8 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     try {
       recoverCompactionFiles(sourceFileIdentifiers, targetFileIdentifiers);
     } catch (CompactionRecoverException e) {
-      logger.error("{} [Compaction][Recover] failed to recover compaction log file {}, abort recover. {}",
+      logger.error(
+          "{} [Compaction][Recover] failed to recover compaction log file {}, abort recover",
           fullStorageGroupName,
           compactionLogFile,
           e);
@@ -105,7 +107,8 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     try {
       Files.deleteIfExists(compactionLogFile.toPath());
     } catch (IOException e) {
-      logger.error("{} [Compaction][Recover] failed to delete compaction log file {}. {}",
+      logger.error(
+          "{} [Compaction][Recover] failed to delete compaction log file {}",
           fullStorageGroupName,
           compactionLogFile,
           e);
@@ -141,7 +144,8 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
         existSeqFiles.size() + existUnSeqFiles.size() == sourceFileIdentifiers.size();
     boolean canRecover = existSeqFiles.size() + existTargetFileNum == sourceSeqFileNum;
     if (!canRecover) {
-      logger.error("{} [Compaction][Recover] Can not recover log file {} because some file is lost",
+      logger.error(
+          "{} [Compaction][Recover] Can not recover log file {} because some file is lost",
           fullStorageGroupName,
           compactionLogFile);
       return;
@@ -174,9 +178,11 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
           try {
             seqFile.releaseResourceAndResetStatus();
           } catch (IOException e) {
-            logger.error("{} [Compaction][Recover] Can not reset status of source file {}",
+            logger.error(
+                "{} [Compaction][Recover] Can not reset status of source file {}",
                 fullStorageGroupName,
-                seqFile);
+                seqFile,
+                e);
           }
         }
       }
@@ -187,7 +193,8 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
       try {
         unSeqFile.revert();
       } catch (InPlaceCompactionErrorException e) {
-        throw new CompactionRecoverException("Can not recover source unsequence file, " + unSeqFile);
+        throw new CompactionRecoverException(
+            "Can not recover source unsequence file, " + unSeqFile);
       }
     }
     // remove target files
@@ -195,7 +202,8 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
       try {
         deleteResourceAndModsFile(identifier);
       } catch (IOException e) {
-        logger.error("{} [Compaction][Recover] can not delete target file {}. {}",
+        logger.error(
+            "{} [Compaction][Recover] can not delete target file {}",
             fullStorageGroupName,
             identifier.getFilePath(),
             e);

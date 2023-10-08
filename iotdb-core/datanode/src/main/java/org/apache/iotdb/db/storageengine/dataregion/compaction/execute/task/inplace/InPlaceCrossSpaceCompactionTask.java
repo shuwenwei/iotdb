@@ -109,6 +109,23 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
   @SuppressWarnings({"squid:S6541", "squid:S3776", "squid:S2142"})
   public boolean doCompaction() {
     long startTime = System.currentTimeMillis();
+
+    LOGGER.info(
+        "{}-{} [Compaction] CrossSpaceCompaction task starts with {} seq files "
+            + "and {} unsequence files. "
+            + "Sequence files : {}, unsequence files : {} . "
+            + "Sequence files size is {} MB, "
+            + "unsequence file size is {} MB, "
+            + "total size is {} MB",
+        storageGroupName,
+        dataRegionId,
+        selectedSequenceFiles.size(),
+        selectedUnsequenceFiles.size(),
+        selectedSequenceFiles,
+        selectedUnsequenceFiles,
+        selectedSeqFileSize / 1024 / 1024,
+        selectedUnseqFileSize / 1024 / 1024,
+        (selectedSeqFileSize + selectedUnseqFileSize) / 1024 / 1024);
     File logFile =
         new File(
             inPlaceCompactionSeqFiles.get(0).tsFileResource.getTsFile().getAbsolutePath()
@@ -168,7 +185,11 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
       return false;
     } catch (InPlaceCompactionCleanupException e) {
       tsFileManager.setAllowCompaction(false); // 考虑是否需要在这一步进行设定？
-      LOGGER.error("fetal error. InPlaceCompaction error when doing cleanup work", e);
+      LOGGER.error(
+          "{}-{} [Compaction] Meet errors when InPlaceCompaction doing cleanup work.",
+          storageGroupName,
+          dataRegionId,
+          e);
       return false;
     } catch (CompactionValidationFailedException e) {
       LOGGER.error(
@@ -197,7 +218,11 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
         try {
           f.releaseResourceAndResetStatus();
         } catch (IOException e) {
-          LOGGER.error("Failed to release resource and reset status", e);
+          LOGGER.error(
+              "{}-{} [Compaction] Failed to release resource and reset status",
+              storageGroupName,
+              dataRegionId,
+              e);
         }
       }
       // <<< 重置原始文件
@@ -205,7 +230,12 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
       try {
         Files.deleteIfExists(logFile.toPath());
       } catch (IOException e) {
-        LOGGER.error("Failed to delete compaction log file");
+        LOGGER.error(
+            "{}-{} [Compaction] Failed to delete compaction log file {}",
+            storageGroupName,
+            dataRegionId,
+            logFile,
+            e);
       }
     }
   }
