@@ -19,7 +19,6 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task;
 
-import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.db.service.metrics.CompactionMetrics;
 import org.apache.iotdb.db.service.metrics.FileMetrics;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionExceptionHandler;
@@ -35,14 +34,11 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.validator.CompactionValidator;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
-import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceList;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
 import org.apache.iotdb.db.storageengine.rescon.memory.SystemInfo;
 
 import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -50,10 +46,6 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
-  protected static final Logger LOGGER =
-      LoggerFactory.getLogger(IoTDBConstant.COMPACTION_LOGGER_NAME);
-  protected TsFileResourceList seqTsFileResourceList;
-  protected TsFileResourceList unseqTsFileResourceList;
   protected File logFile;
   protected List<TsFileResource> targetTsfileResourceList;
   protected List<TsFileResource> holdReadLockList = new ArrayList<>();
@@ -78,10 +70,6 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
         currentTaskNum,
         memoryCost,
         serialId);
-    this.seqTsFileResourceList =
-        tsFileManager.getOrCreateSequenceListByTimePartition(timePartition);
-    this.unseqTsFileResourceList =
-        tsFileManager.getOrCreateUnsequenceListByTimePartition(timePartition);
   }
 
   @Override
@@ -153,8 +141,8 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
             storageGroupName,
             tsFileManager,
             timePartition,
-            seqTsFileResourceList,
-            unseqTsFileResourceList,
+            selectedSequenceFiles,
+            selectedUnsequenceFiles,
             targetTsfileResourceList,
             false,
             false)) {

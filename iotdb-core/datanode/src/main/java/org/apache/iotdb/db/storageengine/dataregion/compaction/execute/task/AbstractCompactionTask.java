@@ -42,7 +42,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class AbstractCompactionTask {
   @SuppressWarnings("squid:S1068")
-  private static final Logger LOGGER =
+  protected static final Logger LOGGER =
       LoggerFactory.getLogger(IoTDBConstant.COMPACTION_LOGGER_NAME);
 
   protected String dataRegionId;

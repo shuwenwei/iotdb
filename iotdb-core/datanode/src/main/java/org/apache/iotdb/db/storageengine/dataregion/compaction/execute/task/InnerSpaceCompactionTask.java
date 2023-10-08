@@ -19,7 +19,6 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task;
 
-import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.service.metrics.CompactionMetrics;
 import org.apache.iotdb.db.service.metrics.FileMetrics;
@@ -39,7 +38,6 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.estimato
 import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.estimator.ReadChunkInnerCompactionEstimator;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
-import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceList;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
 import org.apache.iotdb.db.storageengine.rescon.memory.SystemInfo;
@@ -47,8 +45,6 @@ import org.apache.iotdb.tsfile.common.conf.TSFileConfig;
 import org.apache.iotdb.tsfile.exception.write.TsFileNotCompleteException;
 
 import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -59,8 +55,6 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class InnerSpaceCompactionTask extends AbstractCompactionTask {
-  private static final Logger LOGGER =
-      LoggerFactory.getLogger(IoTDBConstant.COMPACTION_LOGGER_NAME);
 
   protected List<TsFileResource> selectedTsFileResourceList;
   protected TsFileResource targetTsFileResource;
@@ -71,7 +65,6 @@ public class InnerSpaceCompactionTask extends AbstractCompactionTask {
   protected int maxCompactionCount;
   private File logFile;
 
-  protected TsFileResourceList tsFileResourceList;
   protected List<TsFileResource> targetTsFileList;
   protected boolean[] isHoldingReadLock;
   protected boolean[] isHoldingWriteLock;
@@ -110,11 +103,6 @@ public class InnerSpaceCompactionTask extends AbstractCompactionTask {
     for (int i = 0; i < selectedTsFileResourceList.size(); ++i) {
       isHoldingWriteLock[i] = false;
       isHoldingReadLock[i] = false;
-    }
-    if (sequence) {
-      tsFileResourceList = tsFileManager.getOrCreateSequenceListByTimePartition(timePartition);
-    } else {
-      tsFileResourceList = tsFileManager.getOrCreateUnsequenceListByTimePartition(timePartition);
     }
     this.hashCode = this.toString().hashCode();
     this.innerSeqTask = sequence;
@@ -209,21 +197,12 @@ public class InnerSpaceCompactionTask extends AbstractCompactionTask {
         }
 
         // replace the old files with new file, the new is in same position as the old
-        if (sequence) {
-          tsFileManager.replace(
-              selectedTsFileResourceList,
-              Collections.emptyList(),
-              targetTsFileList,
-              timePartition,
-              true);
-        } else {
-          tsFileManager.replace(
-              Collections.emptyList(),
-              selectedTsFileResourceList,
-              targetTsFileList,
-              timePartition,
-              false);
-        }
+        tsFileManager.replace(
+            sequence ? selectedTsFileResourceList : Collections.emptyList(),
+            !sequence ? selectedTsFileResourceList : Collections.emptyList(),
+            targetTsFileList,
+            timePartition,
+            true);
 
         if (targetTsFileResource.isDeleted()) {
           compactionLogger.logFile(targetTsFileResource, CompactionLogger.STR_DELETED_TARGET_FILES);
