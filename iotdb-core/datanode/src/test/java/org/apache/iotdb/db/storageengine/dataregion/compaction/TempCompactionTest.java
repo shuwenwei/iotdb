@@ -9,13 +9,11 @@ import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.DeviceTimeIndex;
 import org.apache.iotdb.tsfile.exception.write.WriteProcessException;
-import org.apache.iotdb.tsfile.file.MetaMarker;
-import org.apache.iotdb.tsfile.file.header.ChunkHeader;
-import org.apache.iotdb.tsfile.file.header.PageHeader;
 import org.apache.iotdb.tsfile.file.metadata.ChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.IChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.TimeseriesMetadata;
 import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
+import org.apache.iotdb.tsfile.read.common.BatchData;
 import org.apache.iotdb.tsfile.read.common.Chunk;
 import org.apache.iotdb.tsfile.read.reader.chunk.ChunkReader;
 import org.apache.iotdb.tsfile.utils.Pair;
@@ -26,7 +24,6 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -52,7 +49,7 @@ public class TempCompactionTest extends AbstractCompactionTest {
 
   @Test
   public void test0() throws IOException {
-    File dir = new File("/Users/shuww/Downloads/fast");
+    File dir = new File("/Users/shuww/Downloads/lasttime");
     // get all seq files under the time partition dir
     List<File> tsFiles =
         Arrays.asList(
@@ -94,12 +91,13 @@ public class TempCompactionTest extends AbstractCompactionTest {
         new InnerSpaceCompactionTask(
             0,
             tsFileManager,
-            resources.subList(0, 30),
+            resources,
             true,
             new ReadChunkCompactionPerformer(),
             new AtomicInteger(0),
             0);
     task1.checkValidAndSetMerging();
+    task1.start();
   }
 
   @Test
@@ -142,36 +140,43 @@ public class TempCompactionTest extends AbstractCompactionTest {
     return true;
   }
 
+  @Test
   public void test2() throws IOException {
-    String path = "/Users/shuww/Downloads/region_2/2/2794/1689851435018-274-0-0.tsfile";
-    String device = "root.NS.FDTY.HNSZNSFDTY0204F030";
+    String path = "/Users/shuww/Downloads/lasttime/1695119977972-291-2-0";
+    //    TsFileResource resource = new TsFileResource(new File(path));
+    //    resource.deserialize();
+    //    System.out.println();
+
+    long previousTime = Long.MIN_VALUE;
     try (TsFileSequenceReader reader = new TsFileSequenceReader(path)) {
-      Map<String, List<TimeseriesMetadata>> allTimeseriesMetadata =
-          reader.getAllTimeseriesMetadata(true);
-      List<TimeseriesMetadata> timeseriesMetadataList = allTimeseriesMetadata.get(device);
-      for (TimeseriesMetadata timeseriesMetadata : timeseriesMetadataList) {
-        if (timeseriesMetadata.getStatistics().getStartTime() != 1689850597328L) {
+      for (String device : reader.getAllDevices()) {
+        if (!device.startsWith("root.bw.baoshan.398726I02.`00`")) {
           continue;
         }
-        for (IChunkMetadata chunkMetadata : timeseriesMetadata.getChunkMetadataList()) {
-          if (chunkMetadata.getStartTime() != 1689850597328L) {
-            continue;
-          }
-          Chunk chunk = reader.readMemChunk((ChunkMetadata) chunkMetadata);
-          ChunkReader chunkReader = new ChunkReader(chunk);
-          ChunkHeader chunkHeader = chunk.getHeader();
-          ByteBuffer chunkDataBuffer = chunk.getData();
-          while (chunkDataBuffer.remaining() > 0) {
-            PageHeader pageHeader;
-            if (((byte) (chunkHeader.getChunkType() & 0x3F))
-                == MetaMarker.ONLY_ONE_PAGE_CHUNK_HEADER) {
-              pageHeader = PageHeader.deserializeFrom(chunkDataBuffer, chunk.getChunkStatistic());
-            } else {
-              pageHeader = PageHeader.deserializeFrom(chunkDataBuffer, chunkHeader.getDataType());
-            }
-
-            if (pageHeader.getStartTime() == 1689850597328L) {
-              System.out.println(chunkHeader.getMeasurementID());
+        Map<String, List<TimeseriesMetadata>> allTimeseriesMetadata =
+            reader.getAllTimeseriesMetadata(true);
+        List<TimeseriesMetadata> timeseriesMetadataList = allTimeseriesMetadata.get(device);
+        for (TimeseriesMetadata timeseriesMetadata : timeseriesMetadataList) {
+          String measurementId = timeseriesMetadata.getMeasurementId();
+          for (IChunkMetadata chunkMetadata : timeseriesMetadata.getChunkMetadataList()) {
+            Chunk chunk = reader.readMemChunk((ChunkMetadata) chunkMetadata);
+            ChunkReader chunkReader = new ChunkReader(chunk, null);
+            while (chunkReader.hasNextSatisfiedPage()) {
+              BatchData batchData = chunkReader.nextPageData();
+              System.out.println("page point num is " + batchData.length());
+              System.out.println("page start " + batchData.getMinTimestamp());
+              while (batchData.hasCurrent()) {
+                long time = batchData.currentTime();
+                if (previousTime >= time) {
+                  System.out.println(
+                      "previous time is " + previousTime + ", current time is " + time);
+                } else {
+                  previousTime = time;
+                }
+                batchData.next();
+              }
+              System.out.println("page end " + batchData.getMaxTimestamp());
+              previousTime = Long.MIN_VALUE;
             }
           }
         }

@@ -194,7 +194,10 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
   private void initReaderCacheMap() throws IOException {
     for (TsFileResource resource : seqFiles) {
       File dataFile = resource.getTsFile();
-      File metadataFile = new File(dataFile.getAbsolutePath() + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX);
+      File metadataFile =
+          new File(
+              dataFile.getAbsolutePath()
+                  + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX);
 
       CompactingTsFileInput tsFileInput =
           new CompactingTsFileInput(dataFile.toPath(), metadataFile.toPath());

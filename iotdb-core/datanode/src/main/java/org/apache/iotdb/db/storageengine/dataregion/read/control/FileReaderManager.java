@@ -19,15 +19,19 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.read.control;
 
+import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.commons.utils.TestOnly;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
+import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
 import org.apache.iotdb.tsfile.common.conf.TSFileConfig;
 import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
 import org.apache.iotdb.tsfile.read.UnClosedTsFileReader;
+import org.apache.iotdb.tsfile.read.reader.CompactingTsFileInput;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
@@ -138,6 +142,42 @@ public class FileReaderManager {
     }
 
     return readerMap.get(filePath);
+  }
+
+  public void occupyPlaceHolderWithCompactingTsFileReader(TsFileResource resource)
+      throws RuntimeException, IOException {
+    if (closedReferenceMap.containsKey(resource.getTsFilePath())) {
+      throw new RuntimeException();
+    }
+    if (resource.getStatus() != TsFileResourceStatus.SPLIT_DURING_COMPACTING) {
+      return;
+    }
+    File dataFile = resource.getTsFile();
+    File metadataFile =
+        new File(
+            dataFile.getAbsolutePath()
+                + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX);
+    CompactingTsFileInput inPlaceCompactingTsFileInput =
+        new CompactingTsFileInput(dataFile.toPath(), metadataFile.toPath());
+    TsFileSequenceReader reader = new TsFileSequenceReader(inPlaceCompactingTsFileInput);
+    closedFileReaderMap.put(resource.getTsFilePath(), reader);
+    closedReferenceMap.put(resource.getTsFilePath(), new AtomicInteger(1));
+  }
+
+  public void releaseCompactingTsFileReaderPlaceholder(TsFileResource resource) {
+    closedReferenceMap.remove(resource.getTsFilePath());
+    TsFileSequenceReader reader = closedFileReaderMap.remove(resource.getTsFilePath());
+    if (reader == null) {
+      return;
+    }
+    if (!(reader.getTsFileInput() instanceof CompactingTsFileInput)) {
+      return;
+    }
+    try {
+      reader.close();
+    } catch (IOException e) {
+      logger.error("Cannot close reader of {}", resource);
+    }
   }
 
   /**

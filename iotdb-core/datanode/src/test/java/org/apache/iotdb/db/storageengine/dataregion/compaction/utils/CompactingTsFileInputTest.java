@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.utils;
 
+import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.commons.exception.MetadataException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.AbstractCompactionTest;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
@@ -53,7 +54,8 @@ public class CompactingTsFileInputTest extends AbstractCompactionTest {
       throws IOException, MetadataException, WriteProcessException, URISyntaxException {
     TsFileResource resource = createEmptyFileAndResource(true);
     File file = resource.getTsFile();
-    String metadataFilePath = file.getAbsolutePath() + ".mt";
+    String metadataFilePath =
+        file.getAbsolutePath() + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX;
     new File(metadataFilePath).createNewFile();
     long splitLength;
     try (CompactionTestFileWriter writer = new CompactionTestFileWriter(resource)) {
@@ -82,7 +84,11 @@ public class CompactingTsFileInputTest extends AbstractCompactionTest {
     new RandomAccessFile(file, "rw").setLength(splitLength);
 
     Path dataPath = resource.getTsFile().toPath();
-    Path metadataPath = new File(resource.getTsFile().getAbsolutePath() + ".mt").toPath();
+    Path metadataPath =
+        new File(
+                resource.getTsFile().getAbsolutePath()
+                    + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX)
+            .toPath();
     CompactingTsFileInput compactingTsFileInput = new CompactingTsFileInput(dataPath, metadataPath);
 
     try (TsFileSequenceReader reader = new TsFileSequenceReader(compactingTsFileInput)) {

@@ -34,6 +34,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subt
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.CompactionLogger;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.validator.CompactionValidator;
+import org.apache.iotdb.db.storageengine.dataregion.read.control.FileReaderManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceList;
@@ -197,6 +198,7 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
           selectedSequenceFiles,
           selectedUnsequenceFiles,
           targetFiles);
+      revertCompactionAndRecoverToInitStatus();
       return false;
     } finally {
       // >>> 系统资源释放
@@ -304,6 +306,12 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
       releaseReadLockAndAcquireWriteLock(inPlaceCompactionSeqFiles);
       releaseReadLockAndAcquireWriteLock(inPlaceCompactionUnSeqFiles);
 
+      // close the special reader and remove it from FileReaderManager
+      for (InPlaceCompactionSeqFile seqFile : inPlaceCompactionSeqFiles) {
+        FileReaderManager.getInstance()
+            .releaseCompactingTsFileReaderPlaceholder(seqFile.getTsFileResource());
+      }
+
       // rename
       for (int i = 0; i < selectedSequenceFiles.size(); i++) {
         TsFileResource resource = selectedSequenceFiles.get(i);
@@ -334,18 +342,16 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
           TsFileResourceManager.getInstance().registerSealedTsFileResource(resource);
         }
       } catch (IOException recoverException) {
-        LOGGER.error("Failed to recover replace");
+        throw new InPlaceCompactionCleanupException("Can not undo replace in TsFileManager");
       }
 
-      LOGGER.error("Failed to rename, recover");
       try {
         for (Map.Entry<Path, Path> entry : renamedFileMap.entrySet()) {
           Files.move(entry.getValue(), entry.getKey());
         }
       } catch (IOException recoverException) {
-        LOGGER.error("Failed to recover rename");
+        throw new InPlaceCompactionCleanupException("Can not undo rename");
       }
-      throw new InPlaceCompactionCleanupException("error when replace target files atomically", e);
     } finally {
       tsFileManager.writeUnlock();
     }

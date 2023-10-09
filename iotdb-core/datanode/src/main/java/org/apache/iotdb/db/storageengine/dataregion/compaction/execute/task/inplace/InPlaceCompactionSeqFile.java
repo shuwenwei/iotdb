@@ -21,6 +21,7 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inp
 
 import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.InPlaceCompactionErrorException;
+import org.apache.iotdb.db.storageengine.dataregion.read.control.FileReaderManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
 import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
@@ -63,7 +64,17 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
     }
     // 4. truncate source file
     truncateSourceFile();
-    // 5. release write lock and acquire read lock
+    // 5. use special TsFileSequenceReader to occupy the placeholder in FileReaderManager
+    try {
+      FileReaderManager.getInstance()
+          .occupyPlaceHolderWithCompactingTsFileReader(this.tsFileResource);
+    } catch (IOException e) {
+      throw new InPlaceCompactionErrorException(
+          String.format(
+              "cannot open file: %s, status: %s",
+              tsFileResource.getTsFilePath(), tsFileResource.getStatus()));
+    }
+    // 6. release write lock and acquire read lock
     releaseWriteLockAndReadLock();
   }
 
@@ -104,6 +115,7 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
     releaseLock();
     try {
       writeLock();
+      FileReaderManager.getInstance().releaseCompactingTsFileReaderPlaceholder(this.tsFileResource);
       if (needReWriteFileMetaToTail()) {
         // 重写尾部 meta
 
@@ -170,7 +182,8 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
 
   public File getMetadataFile() {
     File dataFile = this.tsFileResource.getTsFile();
-    return new File(dataFile.getAbsolutePath() + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX);
+    return new File(
+        dataFile.getAbsolutePath() + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX);
   }
 
   public FileChannel getTsFileChannel() throws IOException {
