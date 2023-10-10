@@ -2,23 +2,21 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction;
 
 import org.apache.iotdb.commons.exception.MetadataException;
 import org.apache.iotdb.db.exception.StorageEngineException;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.ReadChunkCompactionPerformer;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InnerSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
-import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.DeviceTimeIndex;
 import org.apache.iotdb.tsfile.exception.write.WriteProcessException;
 import org.apache.iotdb.tsfile.file.metadata.ChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.IChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.TimeseriesMetadata;
+import org.apache.iotdb.tsfile.file.metadata.enums.TSDataType;
 import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
 import org.apache.iotdb.tsfile.read.common.BatchData;
 import org.apache.iotdb.tsfile.read.common.Chunk;
 import org.apache.iotdb.tsfile.read.reader.chunk.ChunkReader;
 import org.apache.iotdb.tsfile.utils.Pair;
+import org.apache.iotdb.tsfile.write.writer.RestorableTsFileIOWriter;
 
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -31,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.iotdb.tsfile.common.constant.TsFileConstant.TSFILE_SUFFIX;
 
@@ -42,14 +39,14 @@ public class TempCompactionTest extends AbstractCompactionTest {
     super.setUp();
   }
 
-  @After
+  //  @After
   public void tearDown() throws StorageEngineException, IOException {
     super.tearDown();
   }
 
   @Test
   public void test0() throws IOException {
-    File dir = new File("/Users/shuww/Downloads/lasttime");
+    File dir = new File("/Users/shuww/Downloads/mpp_test_file");
     // get all seq files under the time partition dir
     List<File> tsFiles =
         Arrays.asList(
@@ -71,11 +68,64 @@ public class TempCompactionTest extends AbstractCompactionTest {
     List<TsFileResource> resources = new ArrayList<>();
     for (File tsFile : tsFiles) {
       TsFileResource resource = new TsFileResource();
-      resource.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+      //      resource.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
       resource.setFile(tsFile);
       resources.add(resource);
-      resource.deserialize();
+      //      resource.deserialize();
     }
+
+    RestorableTsFileIOWriter writer =
+        new RestorableTsFileIOWriter(resources.get(1).getTsFile(), true);
+    TsFileResource resource = new TsFileResource(resources.get(1).getTsFile());
+    System.out.println(resource.getStartTime("root.test.g_0.dl_1024"));
+    System.out.println(resource.getEndTime("root.test.g_0.dl_1024"));
+    Map<String, List<ChunkMetadata>> deviceChunkMetaDataMap = writer.getDeviceChunkMetadataMap();
+    for (Map.Entry<String, List<ChunkMetadata>> entry : deviceChunkMetaDataMap.entrySet()) {
+      String deviceId = entry.getKey();
+      List<ChunkMetadata> chunkMetadataListFromChunkGroup = entry.getValue();
+
+      // measurement -> ChunkMetadataList
+      Map<String, List<ChunkMetadata>> measurementToChunkMetadatas = new HashMap<>();
+      for (ChunkMetadata chunkMetadata : chunkMetadataListFromChunkGroup) {
+        List<ChunkMetadata> list =
+            measurementToChunkMetadatas.computeIfAbsent(
+                chunkMetadata.getMeasurementUid(), n -> new ArrayList<>());
+        list.add(chunkMetadata);
+      }
+
+      for (List<ChunkMetadata> metadataList : measurementToChunkMetadatas.values()) {
+        TSDataType dataType = metadataList.get(metadataList.size() - 1).getDataType();
+        for (ChunkMetadata chunkMetaData : chunkMetadataListFromChunkGroup) {
+          if (!chunkMetaData.getDataType().equals(dataType)) {
+            //            System.out.println(dataType);
+            //            System.out.println(chunkMetaData.getDataType());
+            if (deviceId.equals("root.test.g_0.dl_1024")) {
+              //              System.out.println(chunkMetaData.getMeasurementUid());
+              //              System.out.println(metadataList.get(metadataList.size() -
+              // 1).getMeasurementUid());
+              //              return;
+              //              System.out.println(chunkMetaData.getDataType());
+              //              System.out.println(dataType);
+            }
+            continue;
+          }
+
+          // calculate startTime and endTime according to chunkMetaData and modifications
+          long startTime = chunkMetaData.getStartTime();
+          long endTime = chunkMetaData.getEndTime();
+          long chunkHeaderOffset = chunkMetaData.getOffsetOfChunkHeader();
+          //          System.out.println(deviceId);
+          //          System.out.println(startTime);
+          //          System.out.println(endTime);
+          resource.updateStartTime(deviceId, startTime);
+          resource.updateEndTime(deviceId, endTime);
+        }
+      }
+    }
+    resource.updatePlanIndexes(writer.getMinPlanIndex());
+    resource.updatePlanIndexes(writer.getMaxPlanIndex());
+    System.out.println(resource.getStartTime("root.test.g_0.dl_3711"));
+    System.out.println(resource.getEndTime("root.test.g_0.dl_3711"));
     //    try (FastCompactionInnerCompactionEstimator estimator =
     //        new FastCompactionInnerCompactionEstimator()) {
     //      long mem = estimator.estimateInnerCompactionMemory(resources);
@@ -87,17 +137,17 @@ public class TempCompactionTest extends AbstractCompactionTest {
     //    List<TsFileResource> selectedSeqResource =
     // selector.selectInnerSpaceTask(resources).get(0);
 
-    InnerSpaceCompactionTask task1 =
-        new InnerSpaceCompactionTask(
-            0,
-            tsFileManager,
-            resources,
-            true,
-            new ReadChunkCompactionPerformer(),
-            new AtomicInteger(0),
-            0);
-    task1.checkValidAndSetMerging();
-    task1.start();
+    //    InnerSpaceCompactionTask task1 =
+    //        new InnerSpaceCompactionTask(
+    //            0,
+    //            tsFileManager,
+    //            resources,
+    //            true,
+    //            new ReadChunkCompactionPerformer(),
+    //            new AtomicInteger(0),
+    //            0);
+    //    task1.checkValidAndSetMerging();
+    //    task1.start();
   }
 
   @Test
