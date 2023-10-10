@@ -67,4 +67,15 @@ public class InPlaceCrossCompactionWriter extends FastCrossCompactionWriter {
       }
     }
   }
+
+  @Override
+  public void endFile() throws IOException {
+    for (int i = 0; i < isEmptyFile.length; i++) {
+      targetFileWriters.get(i).endFile();
+      // set empty target file to DELETED
+      if (isEmptyFile[i] && deviceExistButNotRewrite[i]) {
+        targetResources.get(i).forceMarkDeleted();
+      }
+    }
+  }
 }
