@@ -121,7 +121,8 @@ public class TsFileManager {
           break;
         }
       }
-      List<TsFileResource> unseqTsFileResourceList = unsequenceFiles.computeIfAbsent(partitionId, l -> new TsFileResourceList());
+      List<TsFileResource> unseqTsFileResourceList =
+          unsequenceFiles.computeIfAbsent(partitionId, l -> new TsFileResourceList());
       for (TsFileResource resource : unseqTsFileResourceList) {
         if (!resource.definitelyNotContains(devicePath)) {
           continue;
