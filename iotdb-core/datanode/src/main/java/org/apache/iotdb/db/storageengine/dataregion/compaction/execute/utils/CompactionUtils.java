@@ -19,9 +19,12 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils;
 
+import org.apache.iotdb.commons.conf.CommonDescriptor;
 import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.commons.exception.IllegalPathException;
 import org.apache.iotdb.commons.path.PartialPath;
+import org.apache.iotdb.commons.service.metric.MetricService;
+import org.apache.iotdb.commons.service.metric.enums.Tag;
 import org.apache.iotdb.db.service.metrics.FileMetrics;
 import org.apache.iotdb.db.storageengine.dataregion.modification.Deletion;
 import org.apache.iotdb.db.storageengine.dataregion.modification.Modification;
@@ -30,6 +33,8 @@ import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.DeviceTimeIndex;
+import org.apache.iotdb.metrics.utils.MetricLevel;
+import org.apache.iotdb.metrics.utils.SystemMetric;
 import org.apache.iotdb.tsfile.common.conf.TSFileConfig;
 import org.apache.iotdb.tsfile.common.conf.TSFileDescriptor;
 import org.apache.iotdb.tsfile.common.constant.TsFileConstant;
@@ -58,7 +63,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -74,6 +78,7 @@ import java.util.Set;
 public class CompactionUtils {
   private static final Logger logger =
       LoggerFactory.getLogger(IoTDBConstant.COMPACTION_LOGGER_NAME);
+  private static final String SYSTEM = "system";
 
   private CompactionUtils() {}
 
@@ -503,9 +508,7 @@ public class CompactionUtils {
 
   public static void deleteSourceTsFileAndUpdateFileMetrics(
       List<TsFileResource> resources, boolean seq) {
-    long[] fileSizes = new long[resources.size()];
-    List<String> fileNames = new ArrayList<>(resources.size());
-    int removeSuccessFileNum = 0;
+    List<TsFileResource> removeResources = new ArrayList<>();
     for (TsFileResource resource : resources) {
       if (!resource.remove()) {
         logger.warn(
@@ -513,14 +516,38 @@ public class CompactionUtils {
             resource.getTsFile().getAbsolutePath());
       } else {
         logger.info("[Compaction] delete file: {}", resource.getTsFile().getAbsolutePath());
-        fileSizes[removeSuccessFileNum] = resource.getTsFileSize();
-        fileNames.add(resource.getTsFile().getName());
-        removeSuccessFileNum++;
+        removeResources.add(resource);
       }
     }
-    if (removeSuccessFileNum != 0) {
-      fileSizes = Arrays.copyOfRange(fileSizes, 0, removeSuccessFileNum);
-      FileMetrics.getInstance().deleteFile(fileSizes, seq, fileNames);
+    FileMetrics.getInstance().deleteTsFile(seq, resources);
+  }
+
+  public static boolean isDiskHasSpace() {
+    return isDiskHasSpace(0d);
+  }
+
+  public static boolean isDiskHasSpace(double redundancy) {
+    double freeDisk =
+        MetricService.getInstance()
+            .getAutoGauge(
+                SystemMetric.SYS_DISK_FREE_SPACE.toString(),
+                MetricLevel.CORE,
+                Tag.NAME.toString(),
+                SYSTEM)
+            .value();
+    double totalDisk =
+        MetricService.getInstance()
+            .getAutoGauge(
+                SystemMetric.SYS_DISK_TOTAL_SPACE.toString(),
+                MetricLevel.CORE,
+                Tag.NAME.toString(),
+                SYSTEM)
+            .value();
+
+    if (freeDisk != 0 && totalDisk != 0) {
+      return freeDisk / totalDisk
+          > CommonDescriptor.getInstance().getConfig().getDiskSpaceWarningThreshold() + redundancy;
     }
+    return true;
   }
 }

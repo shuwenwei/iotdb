@@ -22,7 +22,6 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.schedule;
 import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.db.conf.IoTDBConfig;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InnerSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCrossSpaceCompactionTask;
@@ -30,7 +29,6 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.ICompact
 import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.ICrossSpaceSelector;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.utils.CrossCompactionTaskResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
-import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,7 +101,7 @@ public class CompactionScheduler {
               .getInnerUnsequenceCompactionSelector()
               .createInstance(storageGroupName, dataRegionId, timePartition, tsFileManager);
     }
-    List<List<TsFileResource>> taskList =
+    List<InnerSpaceCompactionTask> innerSpaceTaskList =
         innerSpaceCompactionSelector.selectInnerSpaceTask(
             sequence
                 ? tsFileManager.getOrCreateSequenceListByTimePartition(timePartition)
@@ -111,27 +109,8 @@ public class CompactionScheduler {
     // the name of this variable is trySubmitCount, because the task submitted to the queue could be
     // evicted due to the low priority of the task
     int trySubmitCount = 0;
-    for (List<TsFileResource> task : taskList) {
-      ICompactionPerformer performer =
-          sequence
-              ? IoTDBDescriptor.getInstance()
-                  .getConfig()
-                  .getInnerSeqCompactionPerformer()
-                  .createInstance()
-              : IoTDBDescriptor.getInstance()
-                  .getConfig()
-                  .getInnerUnseqCompactionPerformer()
-                  .createInstance();
-      if (CompactionTaskManager.getInstance()
-          .addTaskToWaitingQueue(
-              new InnerSpaceCompactionTask(
-                  timePartition,
-                  tsFileManager,
-                  task,
-                  sequence,
-                  performer,
-                  CompactionTaskManager.currentTaskNum,
-                  tsFileManager.getNextCompactionTaskId()))) {
+    for (InnerSpaceCompactionTask task : innerSpaceTaskList) {
+      if (CompactionTaskManager.getInstance().addTaskToWaitingQueue(task)) {
         trySubmitCount++;
       }
     }

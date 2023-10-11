@@ -81,13 +81,34 @@ public class InnerSpaceCompactionTask extends AbstractCompactionTask {
       ICompactionPerformer performer,
       AtomicInteger currentTaskNum,
       long serialId) {
+    this(
+        timePartition,
+        tsFileManager,
+        selectedTsFileResourceList,
+        sequence,
+        performer,
+        currentTaskNum,
+        serialId,
+        CompactionTaskType.NORMAL);
+  }
+
+  public InnerSpaceCompactionTask(
+      long timePartition,
+      TsFileManager tsFileManager,
+      List<TsFileResource> selectedTsFileResourceList,
+      boolean sequence,
+      ICompactionPerformer performer,
+      AtomicInteger currentTaskNum,
+      long serialId,
+      CompactionTaskType compactionTaskType) {
     super(
         tsFileManager.getStorageGroupName(),
         tsFileManager.getDataRegionId(),
         timePartition,
         tsFileManager,
         currentTaskNum,
-        serialId);
+        serialId,
+        compactionTaskType);
     this.selectedTsFileResourceList = selectedTsFileResourceList;
     this.sequence = sequence;
     this.performer = performer;
@@ -243,7 +264,9 @@ public class InnerSpaceCompactionTask extends AbstractCompactionTask {
         // inner space compaction task has only one target file
         if (!targetTsFileResource.isDeleted()) {
           FileMetrics.getInstance()
-              .addFile(
+              .addTsFile(
+                  targetTsFileResource.getDatabaseName(),
+                  targetTsFileResource.getDataRegionId(),
                   targetTsFileResource.getTsFile().length(),
                   sequence,
                   targetTsFileResource.getTsFile().getName());
@@ -439,6 +462,11 @@ public class InnerSpaceCompactionTask extends AbstractCompactionTask {
   public boolean checkValidAndSetMerging() {
     if (!tsFileManager.isAllowCompaction()) {
       resetCompactionCandidateStatusForAllSourceFiles();
+      return false;
+    }
+    if (!isDiskSpaceCheckPassed()) {
+      LOGGER.debug(
+          "inner compaction task start check failed because disk free ratio is less than disk_space_warning_threshold");
       return false;
     }
     try {

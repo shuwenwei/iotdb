@@ -22,6 +22,7 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task;
 import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.db.service.metrics.CompactionMetrics;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICompactionPerformer;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.CompactionTaskManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
@@ -59,6 +60,8 @@ public abstract class AbstractCompactionTask {
 
   protected long memoryCost = 0L;
 
+  protected CompactionTaskType compactionTaskType;
+
   protected AbstractCompactionTask(
       String storageGroupName,
       String dataRegionId,
@@ -66,12 +69,31 @@ public abstract class AbstractCompactionTask {
       TsFileManager tsFileManager,
       AtomicInteger currentTaskNum,
       long serialId) {
+    this(
+        storageGroupName,
+        dataRegionId,
+        timePartition,
+        tsFileManager,
+        currentTaskNum,
+        serialId,
+        CompactionTaskType.NORMAL);
+  }
+
+  protected AbstractCompactionTask(
+      String storageGroupName,
+      String dataRegionId,
+      long timePartition,
+      TsFileManager tsFileManager,
+      AtomicInteger currentTaskNum,
+      long serialId,
+      CompactionTaskType compactionTaskType) {
     this.storageGroupName = storageGroupName;
     this.dataRegionId = dataRegionId;
     this.timePartition = timePartition;
     this.tsFileManager = tsFileManager;
     this.currentTaskNum = currentTaskNum;
     this.serialId = serialId;
+    this.compactionTaskType = compactionTaskType;
   }
 
   protected abstract List<TsFileResource> getAllSourceTsFiles();
@@ -202,5 +224,16 @@ public abstract class AbstractCompactionTask {
 
   public boolean isInnerSeqTask() {
     return innerSeqTask;
+  }
+
+  public CompactionTaskType getCompactionTaskType() {
+    return compactionTaskType;
+  }
+
+  public boolean isDiskSpaceCheckPassed() {
+    if (compactionTaskType == CompactionTaskType.MOD_SETTLE) {
+      return true;
+    }
+    return CompactionUtils.isDiskHasSpace();
   }
 }

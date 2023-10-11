@@ -197,8 +197,12 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
         for (TsFileResource targetResource : targetTsfileResourceList) {
           if (!targetResource.isDeleted()) {
             FileMetrics.getInstance()
-                .addFile(
-                    targetResource.getTsFileSize(), true, targetResource.getTsFile().getName());
+                .addTsFile(
+                    targetResource.getDatabaseName(),
+                    targetResource.getDataRegionId(),
+                    targetResource.getTsFileSize(),
+                    true,
+                    targetResource.getTsFile().getName());
 
             // set target resources to CLOSED, so that they can be selected to compact
             targetResource.setStatus(TsFileResourceStatus.NORMAL);
@@ -299,6 +303,11 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
   public boolean checkValidAndSetMerging() {
     if (!tsFileManager.isAllowCompaction()) {
       resetCompactionCandidateStatusForAllSourceFiles();
+      return false;
+    }
+    if (!isDiskSpaceCheckPassed()) {
+      LOGGER.debug(
+          "cross compaction task start check failed because disk free ratio is less than disk_space_warning_threshold");
       return false;
     }
     try {
