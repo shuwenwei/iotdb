@@ -126,6 +126,7 @@ public class HashLastFlushTimeMap implements ILastFlushTimeMap {
     if (flushTimeMapForPartition == null) {
       return;
     }
+    recoverFlushTime(timePartitionId, path);
     flushTimeMapForPartition.compute(
         path,
         (k, v) -> {
