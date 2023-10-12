@@ -26,6 +26,7 @@ import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import java.util.ArrayList;
 import java.util.List;
 
+@SuppressWarnings({"squid:S1206", "squid:S2160"})
 public abstract class AbstractCrossSpaceCompactionTask extends AbstractCompactionTask {
 
   protected List<TsFileResource> selectedSequenceFiles;
@@ -95,14 +96,5 @@ public abstract class AbstractCrossSpaceCompactionTask extends AbstractCompactio
   @Override
   public int hashCode() {
     return hashCode;
-  }
-
-  @Override
-  public boolean equals(Object other) {
-    if (!(other instanceof CrossSpaceCompactionTask)) {
-      return false;
-    }
-
-    return equalsOtherTask((CrossSpaceCompactionTask) other);
   }
 }

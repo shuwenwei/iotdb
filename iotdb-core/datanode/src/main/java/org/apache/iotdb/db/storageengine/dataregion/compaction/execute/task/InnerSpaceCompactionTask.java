@@ -295,29 +295,16 @@ public class InnerSpaceCompactionTask extends AbstractCompactionTask {
       }
 
       // handle exception
-      if (isSequence()) {
-        CompactionExceptionHandler.handleException(
-            storageGroupName + "-" + dataRegionId,
-            logFile,
-            targetTsFileList,
-            selectedTsFileResourceList,
-            Collections.emptyList(),
-            tsFileManager,
-            timePartition,
-            true,
-            isSequence());
-      } else {
-        CompactionExceptionHandler.handleException(
-            storageGroupName + "-" + dataRegionId,
-            logFile,
-            targetTsFileList,
-            Collections.emptyList(),
-            selectedTsFileResourceList,
-            tsFileManager,
-            timePartition,
-            true,
-            isSequence());
-      }
+      CompactionExceptionHandler.handleException(
+          storageGroupName + "-" + dataRegionId,
+          logFile,
+          targetTsFileList,
+          sequence ? selectedTsFileResourceList : Collections.emptyList(),
+          !sequence ? selectedTsFileResourceList : Collections.emptyList(),
+          tsFileManager,
+          timePartition,
+          true,
+          isSequence());
     } finally {
       releaseAllLocks();
     }

@@ -54,7 +54,7 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
     // 1. generate tmp meta file
     writeMetadataToMetaFile();
     // 2. release read lock and acquire write lock
-    releaseReadLockAndWriteLock();
+    releaseAcquiredLockAndAcquireWriteLock();
     // 3. change TsFileResource status
     if (!updateTsFileResourceStatusToSplit()) {
       throw new InPlaceCompactionErrorException(

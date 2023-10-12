@@ -25,7 +25,6 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionValidationFailedException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICrossCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.FastCompactionPerformer;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.FastCompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.CompactionLogger;
@@ -41,6 +40,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+@SuppressWarnings({"squid:S1206", "squid:S2160"})
 public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
   protected File logFile;
   protected List<TsFileResource> targetTsfileResourceList;
@@ -257,6 +257,15 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
   }
 
   @Override
+  public boolean equals(Object other) {
+    if (!(other instanceof CrossSpaceCompactionTask)) {
+      return false;
+    }
+
+    return equalsOtherTask((AbstractCompactionTask) other);
+  }
+
+  @Override
   public boolean equalsOtherTask(AbstractCompactionTask otherTask) {
     if (!(otherTask instanceof CrossSpaceCompactionTask)) {
       return false;
@@ -293,8 +302,7 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
 
   @Override
   protected void createSummary() {
-    if (performer instanceof FastCompactionPerformer
-        || performer instanceof InPlaceFastCompactionPerformer) {
+    if (performer instanceof FastCompactionPerformer) {
       this.summary = new FastCompactionTaskSummary();
     } else {
       this.summary = new CompactionTaskSummary();

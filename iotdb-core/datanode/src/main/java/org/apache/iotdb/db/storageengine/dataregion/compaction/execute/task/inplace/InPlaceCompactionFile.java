@@ -54,8 +54,8 @@ public abstract class InPlaceCompactionFile {
     tsFileResource.getCompactionModFile().remove();
   }
 
-  public void releaseReadLockAndWriteLock() {
-    readUnLock();
+  public void releaseAcquiredLockAndAcquireWriteLock() {
+    releaseLock();
     writeLock();
   }
 

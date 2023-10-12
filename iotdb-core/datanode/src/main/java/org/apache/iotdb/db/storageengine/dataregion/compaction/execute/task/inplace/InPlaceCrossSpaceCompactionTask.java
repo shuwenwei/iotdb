@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@SuppressWarnings({"squid:S1206", "squid:S2160"})
 public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
   private final List<InPlaceCompactionSeqFile> inPlaceCompactionSeqFiles;
   private final List<InPlaceCompactionUnSeqFile> inPlaceCompactionUnSeqFiles;
@@ -273,8 +274,8 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
       }
 
       // acquire write lock of source seq files to wait all reading process finish
-      releaseReadLockAndAcquireWriteLock(inPlaceCompactionSeqFiles);
-      releaseReadLockAndAcquireWriteLock(inPlaceCompactionUnSeqFiles);
+      acquireWriteLock(inPlaceCompactionSeqFiles);
+      acquireWriteLock(inPlaceCompactionUnSeqFiles);
 
       // close the special reader and remove it from FileReaderManager
       for (InPlaceCompactionSeqFile seqFile : inPlaceCompactionSeqFiles) {
@@ -430,6 +431,15 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
   }
 
   @Override
+  public boolean equals(Object other) {
+    if (!(other instanceof InPlaceCrossSpaceCompactionTask)) {
+      return false;
+    }
+
+    return equalsOtherTask((AbstractCompactionTask) other);
+  }
+
+  @Override
   public boolean equalsOtherTask(AbstractCompactionTask otherTask) {
     if (!(otherTask instanceof InPlaceCrossSpaceCompactionTask)) {
       return false;
@@ -452,9 +462,9 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
     return getAllSourceTsFiles().size();
   }
 
-  private void releaseReadLockAndAcquireWriteLock(List<? extends InPlaceCompactionFile> files) {
+  private void acquireWriteLock(List<? extends InPlaceCompactionFile> files) {
     for (InPlaceCompactionFile f : files) {
-      f.releaseReadLockAndWriteLock();
+      f.writeLock();
     }
   }
 
