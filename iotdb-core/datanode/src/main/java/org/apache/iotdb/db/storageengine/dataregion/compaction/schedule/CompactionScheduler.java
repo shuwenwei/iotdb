@@ -148,7 +148,6 @@ public class CompactionScheduler {
                   taskList.get(i).getSeqFiles(),
                   taskList.get(i).getUnseqFiles(),
                   new InPlaceFastCompactionPerformer(),
-                  CompactionTaskManager.currentTaskNum,
                   memoryCost.get(i),
                   tsFileManager.getNextCompactionTaskId()))) {
         trySubmitCount++;

@@ -21,6 +21,7 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task;
 
 import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.db.service.metrics.CompactionMetrics;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.FileCannotTransitToCompactingException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.CompactionTaskManager;
@@ -31,8 +32,8 @@ import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * AbstractCompactionTask is the base class for all compaction task, it carries out the execution of
@@ -49,7 +50,6 @@ public abstract class AbstractCompactionTask {
   protected String dataRegionId;
   protected String storageGroupName;
   protected long timePartition;
-  protected final AtomicInteger currentTaskNum;
   protected final TsFileManager tsFileManager;
   protected ICompactionPerformer performer;
   protected int hashCode = -1;
@@ -67,14 +67,12 @@ public abstract class AbstractCompactionTask {
       String dataRegionId,
       long timePartition,
       TsFileManager tsFileManager,
-      AtomicInteger currentTaskNum,
       long serialId) {
     this(
         storageGroupName,
         dataRegionId,
         timePartition,
         tsFileManager,
-        currentTaskNum,
         serialId,
         CompactionTaskType.NORMAL);
   }
@@ -84,14 +82,12 @@ public abstract class AbstractCompactionTask {
       String dataRegionId,
       long timePartition,
       TsFileManager tsFileManager,
-      AtomicInteger currentTaskNum,
       long serialId,
       CompactionTaskType compactionTaskType) {
     this.storageGroupName = storageGroupName;
     this.dataRegionId = dataRegionId;
     this.timePartition = timePartition;
     this.tsFileManager = tsFileManager;
-    this.currentTaskNum = currentTaskNum;
     this.serialId = serialId;
     this.compactionTaskType = compactionTaskType;
   }
@@ -121,13 +117,11 @@ public abstract class AbstractCompactionTask {
   protected abstract boolean doCompaction();
 
   public boolean start() {
-    currentTaskNum.incrementAndGet();
     boolean isSuccess = false;
+    summary.start();
     try {
-      summary.start();
       isSuccess = doCompaction();
     } finally {
-      this.currentTaskNum.decrementAndGet();
       summary.finish(isSuccess);
       CompactionTaskManager.getInstance().removeRunningTaskFuture(this);
       CompactionMetrics.getInstance()
@@ -150,13 +144,21 @@ public abstract class AbstractCompactionTask {
 
   public abstract boolean equalsOtherTask(AbstractCompactionTask otherTask);
 
-  /**
-   * Check if the compaction task is valid (selected files are not merging, closed and exist). If
-   * the task is valid, then set the merging status of selected files to true.
-   *
-   * @return true if the task is valid else false
-   */
-  public abstract boolean checkValidAndSetMerging();
+  public void transitSourceFilesToMerging() throws FileCannotTransitToCompactingException {
+    for (TsFileResource f : getAllSourceTsFiles()) {
+      if (!f.setStatus(TsFileResourceStatus.COMPACTING)) {
+        throw new FileCannotTransitToCompactingException(f);
+      }
+    }
+  }
+
+  public abstract long getEstimatedMemoryCost() throws IOException;
+
+  public abstract int getProcessedFileNum();
+
+  public boolean isCompactionAllowed() {
+    return tsFileManager.isAllowCompaction();
+  }
 
   @Override
   public int hashCode() {

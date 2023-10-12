@@ -25,7 +25,6 @@ import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public abstract class AbstractCrossSpaceCompactionTask extends AbstractCompactionTask {
 
@@ -40,7 +39,6 @@ public abstract class AbstractCrossSpaceCompactionTask extends AbstractCompactio
       List<TsFileResource> selectedSequenceFiles,
       List<TsFileResource> selectedUnsequenceFiles,
       ICrossCompactionPerformer performer,
-      AtomicInteger currentTaskNum,
       long memoryCost,
       long serialId) {
     super(
@@ -48,7 +46,6 @@ public abstract class AbstractCrossSpaceCompactionTask extends AbstractCompactio
         tsFileManager.getDataRegionId(),
         timePartition,
         tsFileManager,
-        currentTaskNum,
         serialId);
     this.selectedSequenceFiles = selectedSequenceFiles;
     this.selectedUnsequenceFiles = selectedUnsequenceFiles;

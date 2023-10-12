@@ -22,8 +22,6 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task;
 import org.apache.iotdb.db.service.metrics.CompactionMetrics;
 import org.apache.iotdb.db.service.metrics.FileMetrics;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionExceptionHandler;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionFileCountExceededException;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionMemoryNotEnoughException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionValidationFailedException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICrossCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.FastCompactionPerformer;
@@ -36,19 +34,16 @@ import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
-import org.apache.iotdb.db.storageengine.rescon.memory.SystemInfo;
 
 import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
   protected File logFile;
   protected List<TsFileResource> targetTsfileResourceList;
-  protected List<TsFileResource> holdReadLockList = new ArrayList<>();
   protected List<TsFileResource> holdWriteLockList = new ArrayList<>();
 
   @SuppressWarnings("squid:S107")
@@ -58,7 +53,6 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
       List<TsFileResource> selectedSequenceFiles,
       List<TsFileResource> selectedUnsequenceFiles,
       ICrossCompactionPerformer performer,
-      AtomicInteger currentTaskNum,
       long memoryCost,
       long serialId) {
     super(
@@ -67,7 +61,6 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
         selectedSequenceFiles,
         selectedUnsequenceFiles,
         performer,
-        currentTaskNum,
         memoryCost,
         serialId);
   }
@@ -172,8 +165,8 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
           }
         }
 
-        releaseReadAndLockWrite(selectedSequenceFiles);
-        releaseReadAndLockWrite(selectedUnsequenceFiles);
+        lockWrite(selectedSequenceFiles);
+        lockWrite(selectedUnsequenceFiles);
 
         for (TsFileResource sequenceResource : selectedSequenceFiles) {
           if (sequenceResource.getModFile().exists()) {
@@ -258,11 +251,7 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
           false,
           true);
     } finally {
-      SystemInfo.getInstance().resetCompactionMemoryCost(memoryCost);
-      SystemInfo.getInstance()
-          .decreaseCompactionFileNumCost(
-              selectedSequenceFiles.size() + selectedUnsequenceFiles.size());
-      releaseAllLocksAndResetStatus();
+      releaseAllLocks();
     }
     return isSuccess;
   }
@@ -278,82 +267,28 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
         && this.performer.getClass().isInstance(otherCrossCompactionTask.performer);
   }
 
-  protected void releaseAllLocksAndResetStatus() {
-    resetCompactionCandidateStatusForAllSourceFiles();
-    for (TsFileResource tsFileResource : holdReadLockList) {
-      tsFileResource.readUnlock();
-    }
+  private void releaseAllLocks() {
     for (TsFileResource tsFileResource : holdWriteLockList) {
       tsFileResource.writeUnlock();
     }
-    holdReadLockList.clear();
     holdWriteLockList.clear();
   }
 
-  protected void releaseReadAndLockWrite(List<TsFileResource> tsFileResourceList) {
+  private void lockWrite(List<TsFileResource> tsFileResourceList) {
     for (TsFileResource tsFileResource : tsFileResourceList) {
-      tsFileResource.readUnlock();
-      holdReadLockList.remove(tsFileResource);
       tsFileResource.writeLock();
       holdWriteLockList.add(tsFileResource);
     }
   }
 
   @Override
-  public boolean checkValidAndSetMerging() {
-    if (!tsFileManager.isAllowCompaction()) {
-      resetCompactionCandidateStatusForAllSourceFiles();
-      return false;
-    }
-    if (!isDiskSpaceCheckPassed()) {
-      LOGGER.debug(
-          "cross compaction task start check failed because disk free ratio is less than disk_space_warning_threshold");
-      return false;
-    }
-    try {
-      SystemInfo.getInstance().addCompactionMemoryCost(memoryCost, 60);
-      SystemInfo.getInstance()
-          .addCompactionFileNum(selectedSequenceFiles.size() + selectedUnsequenceFiles.size(), 60);
-    } catch (Exception e) {
-      if (e instanceof InterruptedException) {
-        LOGGER.warn("Interrupted when allocating memory for compaction", e);
-        Thread.currentThread().interrupt();
-      } else if (e instanceof CompactionMemoryNotEnoughException) {
-        LOGGER.info("No enough memory for current compaction task {}", this, e);
-      } else if (e instanceof CompactionFileCountExceededException) {
-        LOGGER.info("No enough file num for current compaction task {}", this, e);
-        SystemInfo.getInstance().resetCompactionMemoryCost(memoryCost);
-      }
-      resetCompactionCandidateStatusForAllSourceFiles();
-      return false;
-    }
-
-    boolean addReadLockSuccess =
-        addReadLock(selectedSequenceFiles) && addReadLock(selectedUnsequenceFiles);
-    if (!addReadLockSuccess) {
-      SystemInfo.getInstance().resetCompactionMemoryCost(memoryCost);
-      SystemInfo.getInstance()
-          .decreaseCompactionFileNumCost(
-              selectedSequenceFiles.size() + selectedUnsequenceFiles.size());
-    }
-    return addReadLockSuccess;
+  public long getEstimatedMemoryCost() {
+    return memoryCost;
   }
 
-  private boolean addReadLock(List<TsFileResource> tsFileResourceList) {
-    try {
-      for (TsFileResource tsFileResource : tsFileResourceList) {
-        tsFileResource.readLock();
-        holdReadLockList.add(tsFileResource);
-        if (!tsFileResource.setStatus(TsFileResourceStatus.COMPACTING)) {
-          releaseAllLocksAndResetStatus();
-          return false;
-        }
-      }
-    } catch (Exception e) {
-      releaseAllLocksAndResetStatus();
-      throw e;
-    }
-    return true;
+  @Override
+  public int getProcessedFileNum() {
+    return selectedSequenceFiles.size() + selectedUnsequenceFiles.size();
   }
 
   @Override

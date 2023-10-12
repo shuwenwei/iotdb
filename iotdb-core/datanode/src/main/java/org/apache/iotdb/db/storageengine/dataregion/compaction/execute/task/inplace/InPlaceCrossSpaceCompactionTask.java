@@ -21,8 +21,6 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inp
 
 import org.apache.iotdb.db.service.metrics.CompactionMetrics;
 import org.apache.iotdb.db.service.metrics.FileMetrics;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionFileCountExceededException;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionMemoryNotEnoughException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionValidationFailedException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.InPlaceCompactionCleanupException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.InPlaceCompactionErrorException;
@@ -40,7 +38,6 @@ import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceList;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
-import org.apache.iotdb.db.storageengine.rescon.memory.SystemInfo;
 import org.apache.iotdb.db.storageengine.rescon.memory.TsFileResourceManager;
 
 import java.io.File;
@@ -51,7 +48,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
@@ -65,7 +61,6 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
       List<TsFileResource> selectedSequenceFiles,
       List<TsFileResource> selectedUnsequenceFiles,
       ICrossCompactionPerformer performer,
-      AtomicInteger currentTaskNum,
       long memoryCost,
       long serialId) {
     super(
@@ -74,7 +69,6 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
         selectedSequenceFiles,
         selectedUnsequenceFiles,
         performer,
-        currentTaskNum,
         memoryCost,
         serialId);
     // generate a copy of all source seq TsFileResource in memory
@@ -201,30 +195,6 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
       revertCompactionAndRecoverToInitStatus();
       return false;
     } finally {
-      // >>> 系统资源释放
-      SystemInfo.getInstance().resetCompactionMemoryCost(memoryCost);
-      SystemInfo.getInstance()
-          .decreaseCompactionFileNumCost(
-              inPlaceCompactionSeqFiles.size() + selectedUnsequenceFiles.size());
-      // <<< 系统资源释放
-
-      // >>> 重置原始文件
-      List<InPlaceCompactionFile> files =
-          new ArrayList<>(inPlaceCompactionSeqFiles.size() + inPlaceCompactionUnSeqFiles.size());
-      files.addAll(inPlaceCompactionSeqFiles);
-      files.addAll(inPlaceCompactionUnSeqFiles);
-      for (InPlaceCompactionFile f : files) {
-        try {
-          f.releaseResourceAndResetStatus();
-        } catch (IOException e) {
-          LOGGER.error(
-              "{}-{} [Compaction] Failed to release resource and reset status",
-              storageGroupName,
-              dataRegionId,
-              e);
-        }
-      }
-      // <<< 重置原始文件
       // 删除合并日志文件
       try {
         Files.deleteIfExists(logFile.toPath());
@@ -472,71 +442,19 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
   }
 
   @Override
-  public boolean checkValidAndSetMerging() {
-    if (!tsFileManager.isAllowCompaction()) {
-      resetCompactionCandidateStatusForAllSourceFiles();
-      return false;
-    }
-    try {
-      SystemInfo.getInstance().addCompactionMemoryCost(memoryCost, 60);
-      SystemInfo.getInstance()
-          .addCompactionFileNum(selectedSequenceFiles.size() + selectedUnsequenceFiles.size(), 60);
-    } catch (Exception e) {
-      if (e instanceof InterruptedException) {
-        LOGGER.warn("Interrupted when allocating memory for compaction", e);
-        Thread.currentThread().interrupt();
-      } else if (e instanceof CompactionMemoryNotEnoughException) {
-        LOGGER.info("No enough memory for current compaction task {}", this, e);
-      } else if (e instanceof CompactionFileCountExceededException) {
-        LOGGER.info("No enough file num for current compaction task {}", this, e);
-        SystemInfo.getInstance().resetCompactionMemoryCost(memoryCost);
-      }
-      resetCompactionCandidateStatusForAllSourceFiles();
-      return false;
-    }
-
-    boolean addReadLockSuccess =
-        addReadLockAndSetStatusCompacting(inPlaceCompactionSeqFiles)
-            && addReadLockAndSetStatusCompacting(inPlaceCompactionUnSeqFiles);
-    if (!addReadLockSuccess) {
-      SystemInfo.getInstance().resetCompactionMemoryCost(memoryCost);
-      SystemInfo.getInstance()
-          .decreaseCompactionFileNumCost(
-              selectedSequenceFiles.size() + selectedUnsequenceFiles.size());
-    }
-    return addReadLockSuccess;
+  public long getEstimatedMemoryCost() throws IOException {
+    return memoryCost;
   }
 
-  private boolean addReadLockAndSetStatusCompacting(List<? extends InPlaceCompactionFile> files) {
-    try {
-      for (InPlaceCompactionFile f : files) {
-        f.readLock();
-        if (!f.getTsFileResource().setStatus(TsFileResourceStatus.COMPACTING)) {
-          releaseAllLocksAndResetStatus();
-          return false;
-        }
-      }
-    } catch (Exception e) {
-      releaseAllLocksAndResetStatus();
-      throw e;
-    }
-    return true;
+  @Override
+  public int getProcessedFileNum() {
+    // 此处的值获取的不准确
+    return getAllSourceTsFiles().size();
   }
 
   private void releaseReadLockAndAcquireWriteLock(List<? extends InPlaceCompactionFile> files) {
     for (InPlaceCompactionFile f : files) {
       f.releaseReadLockAndWriteLock();
-    }
-  }
-
-  private void releaseAllLocksAndResetStatus() {
-    for (InPlaceCompactionFile inPlaceCompactionFile : inPlaceCompactionSeqFiles) {
-      inPlaceCompactionFile.getTsFileResource().setStatus(TsFileResourceStatus.NORMAL);
-      inPlaceCompactionFile.releaseLock();
-    }
-    for (InPlaceCompactionFile inPlaceCompactionFile : inPlaceCompactionUnSeqFiles) {
-      inPlaceCompactionFile.getTsFileResource().setStatus(TsFileResourceStatus.NORMAL);
-      inPlaceCompactionFile.releaseLock();
     }
   }
 
