@@ -75,7 +75,7 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
               tsFileResource.getTsFilePath(), tsFileResource.getStatus()));
     }
     // 6. release write lock and acquire read lock
-    releaseWriteLockAndReadLock();
+    writeUnLock();
   }
 
   public void writeMetadataToMetaFile() throws InPlaceCompactionErrorException {

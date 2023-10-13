@@ -24,14 +24,18 @@ import org.apache.iotdb.commons.exception.MetadataException;
 import org.apache.iotdb.db.exception.StorageEngineException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.FileCannotTransitToCompactingException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.validator.CompactionValidator;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.CompactionTaskManager;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.CompactionWorker;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.comparator.DefaultCompactionTaskComparatorImpl;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.utils.CompactionTestFileWriter;
 import org.apache.iotdb.db.storageengine.dataregion.modification.ModificationFile;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
 import org.apache.iotdb.db.storageengine.rescon.memory.SystemInfo;
+import org.apache.iotdb.db.utils.datastructure.FixedPriorityBlockingQueue;
 import org.apache.iotdb.tsfile.exception.write.WriteProcessException;
 import org.apache.iotdb.tsfile.file.header.PageHeader;
 import org.apache.iotdb.tsfile.file.metadata.ChunkMetadata;
@@ -59,6 +63,10 @@ import java.util.Map;
 
 public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
 
+  private final FixedPriorityBlockingQueue<AbstractCompactionTask> candidateCompactionTaskQueue =
+      new FixedPriorityBlockingQueue<>(50, new DefaultCompactionTaskComparatorImpl());
+  private final CompactionWorker worker = new CompactionWorker(0, candidateCompactionTaskQueue);
+
   @Before
   public void setUp()
       throws IOException, WriteProcessException, MetadataException, InterruptedException {
@@ -72,7 +80,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
 
   @Test
   public void testOneDeviceOneNonAlignedSeriesWithNonOverlappedFiles()
-      throws IOException, FileCannotTransitToCompactingException {
+      throws IOException {
     List<TsFileResource> seqFiles = new ArrayList<>();
     List<TsFileResource> unseqFiles = new ArrayList<>();
     TsFileResource seqResource1 =
@@ -104,8 +112,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
         new InPlaceCrossSpaceCompactionTask(
             0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
 
-    t.transitSourceFilesToMerging();
-    Assert.assertTrue(t.start());
+    Assert.assertTrue(worker.processOneCompactionTask(t));
     validateCompactionResult(
         t.getSelectedSequenceFiles(),
         t.getSelectedUnsequenceFiles(),
@@ -120,8 +127,8 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
   }
 
   @Test
-  public void testOneDeviceOneAlignedSeriesWithNonOverlappedFiles()
-      throws IOException, FileCannotTransitToCompactingException {
+  public void testOneDeviceAlignedSeriesWithNonOverlappedFiles()
+      throws IOException {
     List<TsFileResource> seqFiles = new ArrayList<>();
     List<TsFileResource> unseqFiles = new ArrayList<>();
     TsFileResource seqResource1 =
@@ -140,7 +147,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             new TimeRange[] {new TimeRange(21, 24)},
             TSEncoding.PLAIN,
             CompressionType.LZ4,
-            true);
+            false);
     unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
 
     seqFiles.add(seqResource1);
@@ -153,8 +160,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
         new InPlaceCrossSpaceCompactionTask(
             0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
 
-    t.transitSourceFilesToMerging();
-    Assert.assertTrue(t.start());
+    Assert.assertTrue(worker.processOneCompactionTask(t));
     validateCompactionResult(
         t.getSelectedSequenceFiles(),
         t.getSelectedUnsequenceFiles(),
@@ -170,8 +176,57 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
   }
 
   @Test
+  public void testDifferentDeviceAlignedSeriesWithNonOverlappedFiles()
+      throws IOException {
+    List<TsFileResource> seqFiles = new ArrayList<>();
+    List<TsFileResource> unseqFiles = new ArrayList<>();
+    TsFileResource seqResource1 =
+        generateSingleAlignedSeriesFile(
+            "d1",
+            Arrays.asList("s1", "s2"),
+            new TimeRange[] {new TimeRange(10, 20)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+    seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+    TsFileResource unseqResource1 =
+        generateSingleAlignedSeriesFile(
+            "d2",
+            Arrays.asList("s1", "s2"),
+            new TimeRange[] {new TimeRange(21, 24)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+    unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+
+    seqFiles.add(seqResource1);
+    unseqFiles.add(unseqResource1);
+    tsFileManager.addAll(seqFiles, true);
+    tsFileManager.addAll(unseqFiles, false);
+
+    CompactionTaskManager.getInstance().start();
+    InPlaceCrossSpaceCompactionTask t =
+        new InPlaceCrossSpaceCompactionTask(
+            0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
+
+    Assert.assertTrue(worker.processOneCompactionTask(t));
+    validateCompactionResult(
+        t.getSelectedSequenceFiles(),
+        t.getSelectedUnsequenceFiles(),
+        tsFileManager.getTsFileList(true));
+    File targetFile = tsFileManager.getTsFileList(true).get(0).getTsFile();
+    Assert.assertFalse(
+        new File(targetFile.getAbsolutePath() + ModificationFile.FILE_SUFFIX).exists());
+    assertDeviceTimeRange(tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 10, 20);
+    try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
+      assertMeasurementTimeRange(reader, "root.testsg.d1", "s1", 10, 20);
+      assertMeasurementTimeRange(reader, "root.testsg.d2", "s2", 21, 24);
+    }
+  }
+
+  @Test
   public void testOneDeviceOneNonAlignedSeriesWithOverlappedFiles()
-      throws IOException, FileCannotTransitToCompactingException {
+      throws IOException {
     List<TsFileResource> seqFiles = new ArrayList<>();
     List<TsFileResource> unseqFiles = new ArrayList<>();
     TsFileResource seqResource1 =
@@ -203,8 +258,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
         new InPlaceCrossSpaceCompactionTask(
             0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
 
-    t.transitSourceFilesToMerging();
-    Assert.assertTrue(t.start());
+    Assert.assertTrue(worker.processOneCompactionTask(t));
     validateCompactionResult(
         t.getSelectedSequenceFiles(),
         t.getSelectedUnsequenceFiles(),
@@ -220,7 +274,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
 
   @Test
   public void testOneDeviceDifferentNonAlignedSeriesWithNonOverlappedFiles()
-      throws IOException, FileCannotTransitToCompactingException {
+      throws IOException {
     List<TsFileResource> seqFiles = new ArrayList<>();
     List<TsFileResource> unseqFiles = new ArrayList<>();
     TsFileResource seqResource1 =
@@ -252,8 +306,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
         new InPlaceCrossSpaceCompactionTask(
             0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
 
-    t.transitSourceFilesToMerging();
-    Assert.assertTrue(t.start());
+    Assert.assertTrue(worker.processOneCompactionTask(t));
     validateCompactionResult(
         t.getSelectedSequenceFiles(),
         t.getSelectedUnsequenceFiles(),
@@ -270,7 +323,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
 
   @Test
   public void testDifferentDeviceNonAlignedSeriesWithNonOverlappedFiles()
-      throws IOException, FileCannotTransitToCompactingException {
+      throws IOException {
     List<TsFileResource> seqFiles = new ArrayList<>();
     List<TsFileResource> unseqFiles = new ArrayList<>();
     TsFileResource seqResource1 =
@@ -302,8 +355,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
         new InPlaceCrossSpaceCompactionTask(
             0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
 
-    t.transitSourceFilesToMerging();
-    Assert.assertTrue(t.start());
+    Assert.assertTrue(worker.processOneCompactionTask(t));
     validateCompactionResult(
         t.getSelectedSequenceFiles(),
         t.getSelectedUnsequenceFiles(),
@@ -320,7 +372,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
 
   @Test
   public void testOneDeviceOneNonAlignedSeriesWithMultiOverlappedFiles1()
-      throws IOException, FileCannotTransitToCompactingException {
+      throws IOException {
     List<TsFileResource> seqFiles = new ArrayList<>();
     List<TsFileResource> unseqFiles = new ArrayList<>();
     TsFileResource seqResource1 =
@@ -395,8 +447,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
         new InPlaceCrossSpaceCompactionTask(
             0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
 
-    t.transitSourceFilesToMerging();
-    Assert.assertTrue(t.start());
+    Assert.assertTrue(worker.processOneCompactionTask(t));
     validateCompactionResult(
         t.getSelectedSequenceFiles(),
         t.getSelectedUnsequenceFiles(),
@@ -424,7 +475,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
 
   @Test
   public void testOneDeviceOneNonAlignedSeriesWithMultiOverlappedFiles()
-      throws IOException, FileCannotTransitToCompactingException {
+      throws IOException {
     List<TsFileResource> seqFiles = new ArrayList<>();
     List<TsFileResource> unseqFiles = new ArrayList<>();
     TsFileResource seqResource1 =
@@ -499,8 +550,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
         new InPlaceCrossSpaceCompactionTask(
             0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
 
-    t.transitSourceFilesToMerging();
-    Assert.assertTrue(t.start());
+    Assert.assertTrue(worker.processOneCompactionTask(t));
     validateCompactionResult(
         t.getSelectedSequenceFiles(),
         t.getSelectedUnsequenceFiles(),
@@ -528,7 +578,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
 
   @Test
   public void testUnseqDeviceNotExistInSeqFiles()
-      throws IOException, FileCannotTransitToCompactingException {
+      throws IOException {
     List<TsFileResource> seqFiles = new ArrayList<>();
     List<TsFileResource> unseqFiles = new ArrayList<>();
     TsFileResource seqResource1 =
@@ -603,8 +653,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
         new InPlaceCrossSpaceCompactionTask(
             0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
 
-    t.transitSourceFilesToMerging();
-    Assert.assertTrue(t.start());
+    Assert.assertTrue(worker.processOneCompactionTask(t));
     validateCompactionResult(
         t.getSelectedSequenceFiles(),
         t.getSelectedUnsequenceFiles(),
@@ -632,47 +681,6 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     }
   }
 
-  @Test
-  public void test2() {
-    try (TsFileSequenceReader reader =
-        new TsFileSequenceReader(
-            "/home/sww/source-codes/iotdb/iotdb-core/datanode/target/data/sequence/root.testsg/0/0/0-18-0-0.tsfile")) {
-      final Map<String, List<ChunkMetadata>> deviceChunkMetadataMap =
-          reader.readChunkMetadataInDevice("root.testsg.d1");
-      for (Map.Entry<String, List<ChunkMetadata>> measurementChunkMetadataListEntry :
-          deviceChunkMetadataMap.entrySet()) {
-        System.out.println(measurementChunkMetadataListEntry.getKey());
-        for (ChunkMetadata chunkMetadata : measurementChunkMetadataListEntry.getValue()) {
-          System.out.println(chunkMetadata);
-
-          final Chunk chunk = reader.readMemChunk(chunkMetadata);
-          ChunkReader chunkReader = new ChunkReader(chunk);
-
-          final PageHeader pageHeader =
-              PageHeader.deserializeFrom(chunk.getData(), chunkMetadata.getStatistics());
-          final ByteBuffer pageBuffer = chunkReader.readPageDataWithoutUncompressing(pageHeader);
-
-          final TsBlock tsBlock = chunkReader.readPageData(pageHeader, pageBuffer);
-          final TsBlock.TsBlockRowIterator tsBlockRowIterator = tsBlock.getTsBlockRowIterator();
-
-          long sum = 0;
-          int intSum = 0;
-          while (tsBlockRowIterator.hasNext()) {
-            final Object[] next = tsBlockRowIterator.next();
-            System.out.print(next[0]);
-            System.out.print("  ");
-            System.out.println(next[1]);
-            sum += (Integer) next[0];
-            intSum += (Integer) next[0];
-          }
-          System.out.println(sum);
-          System.out.println(intSum);
-        }
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-  }
 
   private TsFileResource generateSingleNonAlignedSeriesFile(
       String device,
@@ -720,7 +728,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     Assert.assertEquals(SystemInfo.getInstance().getCompactionMemoryCost().get(), 0L);
     for (TsFileResource resource : sourceSeqFiles) {
       String tsFilePath = resource.getTsFilePath();
-      Assert.assertEquals(resource.getStatus(), TsFileResourceStatus.DELETED);
+      Assert.assertEquals(TsFileResourceStatus.DELETED, resource.getStatus());
       Assert.assertFalse(new File(tsFilePath + TsFileResource.RESOURCE_SUFFIX).exists());
       Assert.assertFalse(new File(tsFilePath + ModificationFile.FILE_SUFFIX).exists());
       Assert.assertFalse(new File(tsFilePath + ModificationFile.COMPACTION_FILE_SUFFIX).exists());
@@ -732,7 +740,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     }
     for (TsFileResource resource : sourceUnSeqFiles) {
       String tsFilePath = resource.getTsFilePath();
-      Assert.assertEquals(resource.getStatus(), TsFileResourceStatus.DELETED);
+      Assert.assertEquals(TsFileResourceStatus.DELETED, resource.getStatus());
       Assert.assertFalse(new File(tsFilePath + TsFileResource.RESOURCE_SUFFIX).exists());
       Assert.assertFalse(new File(tsFilePath + ModificationFile.FILE_SUFFIX).exists());
       Assert.assertFalse(new File(tsFilePath + ModificationFile.COMPACTION_FILE_SUFFIX).exists());
@@ -742,7 +750,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     // validate target files
     for (TsFileResource resource : targetFiles) {
       String tsFilePath = resource.getTsFilePath();
-      Assert.assertEquals(resource.getStatus(), TsFileResourceStatus.NORMAL);
+      Assert.assertEquals(TsFileResourceStatus.NORMAL, resource.getStatus());
       Assert.assertTrue(resource.getTsFile().exists());
       Assert.assertTrue(new File(tsFilePath + TsFileResource.RESOURCE_SUFFIX).exists());
       Assert.assertTrue(CompactionValidator.getInstance().validateSingleTsFile(resource));

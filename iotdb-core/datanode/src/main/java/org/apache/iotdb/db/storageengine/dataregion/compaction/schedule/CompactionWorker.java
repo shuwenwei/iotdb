@@ -54,26 +54,26 @@ public class CompactionWorker implements Runnable {
   @Override
   public void run() {
     while (!Thread.currentThread().isInterrupted()) {
-      processOneCompactionTask();
+      AbstractCompactionTask task;
+      try {
+        task = compactionTaskQueue.take();
+      } catch (InterruptedException e) {
+        log.warn("CompactionThread-{} terminates because interruption", threadId);
+        Thread.currentThread().interrupt();
+        return;
+      }
+      processOneCompactionTask(task);
     }
   }
 
-  private void processOneCompactionTask() {
-    AbstractCompactionTask task;
-    try {
-      task = compactionTaskQueue.take();
-    } catch (InterruptedException e) {
-      log.warn("CompactionThread-{} terminates because interruption", threadId);
-      Thread.currentThread().interrupt();
-      return;
-    }
+  public boolean processOneCompactionTask(AbstractCompactionTask task) {
     long estimatedMemoryCost = 0L;
     boolean memoryAcquired = false;
     boolean fileHandleAcquired = false;
     try {
       if (task == null || !task.isCompactionAllowed()) {
         log.info("Compaction task is not allowed to be executed by TsFileManager. Task {}", task);
-        return;
+        return false;
       }
       task.transitSourceFilesToMerging();
       if (IoTDBDescriptor.getInstance().getConfig().isEnableCompactionMemControl()) {
@@ -86,6 +86,7 @@ public class CompactionWorker implements Runnable {
       CompactionTaskFuture future = new CompactionTaskFuture(summary);
       CompactionTaskManager.getInstance().recordTask(task, future);
       task.start();
+      return true;
     } catch (FileCannotTransitToCompactingException
         | IOException
         | CompactionMemoryNotEnoughException
@@ -105,6 +106,7 @@ public class CompactionWorker implements Runnable {
         SystemInfo.getInstance().decreaseCompactionFileNumCost(task.getProcessedFileNum());
       }
     }
+    return false;
   }
 
   static class CompactionTaskFuture implements Future<CompactionTaskSummary> {

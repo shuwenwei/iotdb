@@ -196,6 +196,21 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
       revertCompactionAndRecoverToInitStatus();
       return false;
     } finally {
+      List<InPlaceCompactionFile> files =
+          new ArrayList<>(inPlaceCompactionSeqFiles.size() + inPlaceCompactionUnSeqFiles.size());
+      files.addAll(inPlaceCompactionSeqFiles);
+      files.addAll(inPlaceCompactionUnSeqFiles);
+      for (InPlaceCompactionFile f : files) {
+        try {
+          f.releaseResourceAndResetStatus();
+        } catch (IOException e) {
+          LOGGER.error(
+              "{}-{} [Compaction] Failed to release resource and reset status",
+              storageGroupName,
+              dataRegionId,
+              e);
+        }
+      }
       // 删除合并日志文件
       try {
         Files.deleteIfExists(logFile.toPath());

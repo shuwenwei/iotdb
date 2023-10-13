@@ -6,6 +6,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.Com
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.DeviceTimeIndex;
 import org.apache.iotdb.tsfile.exception.write.WriteProcessException;
+import org.apache.iotdb.tsfile.file.header.PageHeader;
 import org.apache.iotdb.tsfile.file.metadata.ChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.IChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.TimeseriesMetadata;
@@ -13,6 +14,7 @@ import org.apache.iotdb.tsfile.file.metadata.enums.TSDataType;
 import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
 import org.apache.iotdb.tsfile.read.common.BatchData;
 import org.apache.iotdb.tsfile.read.common.Chunk;
+import org.apache.iotdb.tsfile.read.common.block.TsBlock;
 import org.apache.iotdb.tsfile.read.reader.chunk.ChunkReader;
 import org.apache.iotdb.tsfile.utils.Pair;
 import org.apache.iotdb.tsfile.write.writer.RestorableTsFileIOWriter;
@@ -22,6 +24,7 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -42,6 +45,48 @@ public class TempCompactionTest extends AbstractCompactionTest {
   //  @After
   public void tearDown() throws StorageEngineException, IOException {
     super.tearDown();
+  }
+
+  @Test
+  public void test4() {
+    try (TsFileSequenceReader reader =
+             new TsFileSequenceReader(
+                 "/home/sww/source-codes/iotdb/iotdb-core/datanode/target/data/sequence/root.testsg/0/0/0-18-0-0.tsfile")) {
+      final Map<String, List<ChunkMetadata>> deviceChunkMetadataMap =
+          reader.readChunkMetadataInDevice("root.testsg.d1");
+      for (Map.Entry<String, List<ChunkMetadata>> measurementChunkMetadataListEntry :
+          deviceChunkMetadataMap.entrySet()) {
+        System.out.println(measurementChunkMetadataListEntry.getKey());
+        for (ChunkMetadata chunkMetadata : measurementChunkMetadataListEntry.getValue()) {
+          System.out.println(chunkMetadata);
+
+          final Chunk chunk = reader.readMemChunk(chunkMetadata);
+          ChunkReader chunkReader = new ChunkReader(chunk);
+
+          final PageHeader pageHeader =
+              PageHeader.deserializeFrom(chunk.getData(), chunkMetadata.getStatistics());
+          final ByteBuffer pageBuffer = chunkReader.readPageDataWithoutUncompressing(pageHeader);
+
+          final TsBlock tsBlock = chunkReader.readPageData(pageHeader, pageBuffer);
+          final TsBlock.TsBlockRowIterator tsBlockRowIterator = tsBlock.getTsBlockRowIterator();
+
+          long sum = 0;
+          int intSum = 0;
+          while (tsBlockRowIterator.hasNext()) {
+            final Object[] next = tsBlockRowIterator.next();
+            System.out.print(next[0]);
+            System.out.print("  ");
+            System.out.println(next[1]);
+            sum += (Integer) next[0];
+            intSum += (Integer) next[0];
+          }
+          System.out.println(sum);
+          System.out.println(intSum);
+        }
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
   }
 
   @Test
