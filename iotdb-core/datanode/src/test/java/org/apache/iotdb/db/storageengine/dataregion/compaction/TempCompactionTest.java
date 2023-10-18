@@ -50,8 +50,8 @@ public class TempCompactionTest extends AbstractCompactionTest {
   @Test
   public void test4() {
     try (TsFileSequenceReader reader =
-             new TsFileSequenceReader(
-                 "/home/sww/source-codes/iotdb/iotdb-core/datanode/target/data/sequence/root.testsg/0/0/0-18-0-0.tsfile")) {
+        new TsFileSequenceReader(
+            "/home/sww/source-codes/iotdb/iotdb-core/datanode/target/data/sequence/root.testsg/0/0/0-18-0-0.tsfile")) {
       final Map<String, List<ChunkMetadata>> deviceChunkMetadataMap =
           reader.readChunkMetadataInDevice("root.testsg.d1");
       for (Map.Entry<String, List<ChunkMetadata>> measurementChunkMetadataListEntry :
