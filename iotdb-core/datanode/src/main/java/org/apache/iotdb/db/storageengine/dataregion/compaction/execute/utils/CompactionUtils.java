@@ -171,7 +171,10 @@ public class CompactionUtils {
       throws IOException, IllegalPathException {
     Set<Modification> modifications = new HashSet<>();
     for (TsFileResource unseqFile : unseqResources) {
-      modifications.addAll(ModificationFile.getCompactionMods(unseqFile).getModifications());
+      for (Modification modification : ModificationFile.getCompactionMods(unseqFile).getModifications()) {
+        modification.setFileOffset(Long.MAX_VALUE);
+        modifications.add(modification);
+      }
     }
 
     for (int i = 0; i < seqResources.size(); i++) {
@@ -183,6 +186,10 @@ public class CompactionUtils {
         long newOffset = Math.min(dataSizeBeforeCompaction, seqModification.getFileOffset());
         seqModification.setFileOffset(newOffset);
       }
+      for (Modification seqCompactionModification : ModificationFile.getCompactionMods(seqFile).getModifications()) {
+        seqCompactionModification.setFileOffset(Long.MAX_VALUE);
+        seqModifications.add(seqCompactionModification);
+      }
       seqModifications.addAll(modifications);
       Set<String> rewriteDevices =
           rewriteDeviceOfSeqFiles.getOrDefault(seqFile, Collections.emptySet());
@@ -192,9 +199,6 @@ public class CompactionUtils {
               + ModificationFile.FILE_SUFFIX;
       try (ModificationFile modificationFile = new ModificationFile(targetModificationFilePath)) {
         for (Modification modification : seqModifications) {
-          // we have to set modification offset to MAX_VALUE, as the offset of source chunk may
-          // change after compaction
-          modification.setFileOffset(Long.MAX_VALUE);
           modificationFile.write(modification);
         }
         for (String device : rewriteDevices) {

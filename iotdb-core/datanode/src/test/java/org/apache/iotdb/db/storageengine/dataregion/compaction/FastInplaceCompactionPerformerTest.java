@@ -231,6 +231,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     }
   }
 
+
   @Test
   public void testOneSourceSeqFileOverlappedAlignedDeviceHasPartialDeletion()
       throws IOException, IllegalPathException {
@@ -284,6 +285,574 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
       assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 16, 24);
       assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s2", 16, 24);
+    }
+  }
+
+  @Test
+  public void testOneSourceSeqFileOverlappedNonAlignedDeviceHasFullDeletion1()
+      throws IOException, IllegalPathException {
+    List<TsFileResource> seqFiles = new ArrayList<>();
+    List<TsFileResource> unseqFiles = new ArrayList<>();
+    TsFileResource seqResource1 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(10, 20)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+    seqResource1
+        .getModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), Long.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE));
+    seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+    TsFileResource unseqResource1 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(21, 24)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+    unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+
+    seqFiles.add(seqResource1);
+    unseqFiles.add(unseqResource1);
+    tsFileManager.addAll(seqFiles, true);
+    tsFileManager.addAll(unseqFiles, false);
+
+    CompactionTaskManager.getInstance().start();
+    InPlaceCrossSpaceCompactionTask t =
+        new InPlaceCrossSpaceCompactionTask(
+            0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
+
+    Assert.assertTrue(worker.processOneCompactionTask(t));
+    validateCompactionResult(
+        t.getSelectedSequenceFiles(),
+        t.getSelectedUnsequenceFiles(),
+        tsFileManager.getTsFileList(true));
+    File targetFile = tsFileManager.getTsFileList(true).get(0).getTsFile();
+    ModificationFile modsFile = tsFileManager.getTsFileList(true).get(0).getModFile();
+    Assert.assertTrue(modsFile.exists());
+    assertDeviceTimeRangeInResource(
+        tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 21, 24);
+    try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
+      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 21, 24);
+    }
+  }
+
+  @Test
+  public void testOneSourceSeqFileOverlappedNonAlignedDeviceHasFullDeletion2()
+      throws IOException, IllegalPathException {
+    List<TsFileResource> seqFiles = new ArrayList<>();
+    List<TsFileResource> unseqFiles = new ArrayList<>();
+    TsFileResource seqResource1 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(10, 20)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+    seqResource1
+        .getModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), Long.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE));
+    seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+    TsFileResource unseqResource1 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(15, 24)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+    unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+
+    seqFiles.add(seqResource1);
+    unseqFiles.add(unseqResource1);
+    tsFileManager.addAll(seqFiles, true);
+    tsFileManager.addAll(unseqFiles, false);
+
+    CompactionTaskManager.getInstance().start();
+    InPlaceCrossSpaceCompactionTask t =
+        new InPlaceCrossSpaceCompactionTask(
+            0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
+
+    Assert.assertTrue(worker.processOneCompactionTask(t));
+    validateCompactionResult(
+        t.getSelectedSequenceFiles(),
+        t.getSelectedUnsequenceFiles(),
+        tsFileManager.getTsFileList(true));
+    File targetFile = tsFileManager.getTsFileList(true).get(0).getTsFile();
+    ModificationFile modsFile = tsFileManager.getTsFileList(true).get(0).getModFile();
+    Assert.assertTrue(modsFile.exists());
+    assertDeviceTimeRangeInResource(
+        tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 15, 24);
+    try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
+      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 15, 24);
+    }
+  }
+
+  @Test
+  public void testOneSourceSeqFileOverlappedAlignedDeviceHasFullDeletion1()
+      throws IOException, IllegalPathException {
+    List<TsFileResource> seqFiles = new ArrayList<>();
+    List<TsFileResource> unseqFiles = new ArrayList<>();
+    TsFileResource seqResource1 =
+        generateSingleAlignedSeriesFile(
+            "d1",
+            Arrays.asList("s1", "s2"),
+            new TimeRange[] {new TimeRange(10, 20)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+    seqResource1
+        .getModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), Long.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE));
+    seqResource1
+        .getModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), Long.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE));
+    seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+    TsFileResource unseqResource1 =
+        generateSingleAlignedSeriesFile(
+            "d1",
+            Arrays.asList("s1", "s2"),
+            new TimeRange[] {new TimeRange(21, 24)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+    unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+
+    seqFiles.add(seqResource1);
+    unseqFiles.add(unseqResource1);
+    tsFileManager.addAll(seqFiles, true);
+    tsFileManager.addAll(unseqFiles, false);
+
+    CompactionTaskManager.getInstance().start();
+    InPlaceCrossSpaceCompactionTask t =
+        new InPlaceCrossSpaceCompactionTask(
+            0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
+
+    Assert.assertTrue(worker.processOneCompactionTask(t));
+    validateCompactionResult(
+        t.getSelectedSequenceFiles(),
+        t.getSelectedUnsequenceFiles(),
+        tsFileManager.getTsFileList(true));
+    File targetFile = tsFileManager.getTsFileList(true).get(0).getTsFile();
+    ModificationFile modsFile = tsFileManager.getTsFileList(true).get(0).getModFile();
+    Assert.assertTrue(modsFile.exists());
+    assertDeviceTimeRangeInResource(
+        tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 21, 24);
+    try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
+      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 21, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s2", 21, 24);
+    }
+  }
+
+  @Test
+  public void testOneSourceSeqFileOverlappedAlignedDeviceHasFullDeletion2()
+      throws IOException, IllegalPathException {
+    List<TsFileResource> seqFiles = new ArrayList<>();
+    List<TsFileResource> unseqFiles = new ArrayList<>();
+    TsFileResource seqResource1 =
+        generateSingleAlignedSeriesFile(
+            "d1",
+            Arrays.asList("s1", "s2"),
+            new TimeRange[] {new TimeRange(10, 20)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+    seqResource1
+        .getModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), Long.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE));
+    seqResource1
+        .getModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), Long.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE));
+    seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+    TsFileResource unseqResource1 =
+        generateSingleAlignedSeriesFile(
+            "d1",
+            Arrays.asList("s1", "s2"),
+            new TimeRange[] {new TimeRange(15, 24)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+    unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+
+    seqFiles.add(seqResource1);
+    unseqFiles.add(unseqResource1);
+    tsFileManager.addAll(seqFiles, true);
+    tsFileManager.addAll(unseqFiles, false);
+
+    CompactionTaskManager.getInstance().start();
+    InPlaceCrossSpaceCompactionTask t =
+        new InPlaceCrossSpaceCompactionTask(
+            0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
+
+    Assert.assertTrue(worker.processOneCompactionTask(t));
+    validateCompactionResult(
+        t.getSelectedSequenceFiles(),
+        t.getSelectedUnsequenceFiles(),
+        tsFileManager.getTsFileList(true));
+    File targetFile = tsFileManager.getTsFileList(true).get(0).getTsFile();
+    ModificationFile modsFile = tsFileManager.getTsFileList(true).get(0).getModFile();
+    Assert.assertTrue(modsFile.exists());
+    assertDeviceTimeRangeInResource(
+        tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 15, 24);
+    try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
+      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 15, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s2", 15, 24);
+    }
+  }
+
+  @Test
+  public void testOneSourceSeqFileOverlappedNonAlignedDeviceHasPartialDeletionAndCompactionMods()
+      throws IOException, IllegalPathException {
+    List<TsFileResource> seqFiles = new ArrayList<>();
+    List<TsFileResource> unseqFiles = new ArrayList<>();
+    TsFileResource seqResource1 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(10, 20)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+    seqResource1
+        .getModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), 0, 15));
+    seqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), 0, 15));
+    seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+    TsFileResource unseqResource1 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(21, 24)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+    unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+
+    seqFiles.add(seqResource1);
+    unseqFiles.add(unseqResource1);
+    tsFileManager.addAll(seqFiles, true);
+    tsFileManager.addAll(unseqFiles, false);
+
+    CompactionTaskManager.getInstance().start();
+    InPlaceCrossSpaceCompactionTask t =
+        new InPlaceCrossSpaceCompactionTask(
+            0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
+
+    Assert.assertTrue(worker.processOneCompactionTask(t));
+    validateCompactionResult(
+        t.getSelectedSequenceFiles(),
+        t.getSelectedUnsequenceFiles(),
+        tsFileManager.getTsFileList(true));
+    File targetFile = tsFileManager.getTsFileList(true).get(0).getTsFile();
+    ModificationFile modsFile = tsFileManager.getTsFileList(true).get(0).getModFile();
+    Assert.assertTrue(modsFile.exists());
+    assertDeviceTimeRangeInResource(
+        tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 16, 24);
+    try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
+      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 16, 24);
+    }
+  }
+
+  @Test
+  public void testOneSourceSeqFileOverlappedAlignedDeviceHasPartialDeletionAndCompactionMods()
+      throws IOException, IllegalPathException {
+    List<TsFileResource> seqFiles = new ArrayList<>();
+    List<TsFileResource> unseqFiles = new ArrayList<>();
+    TsFileResource seqResource1 =
+        generateSingleAlignedSeriesFile(
+            "d1",
+            Arrays.asList("s1", "s2"),
+            new TimeRange[] {new TimeRange(10, 20)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+    seqResource1
+        .getModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), 0, 15));
+    seqResource1
+        .getModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), seqResource1.getTsFileSize(), 0, 15));
+    seqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), seqResource1.getTsFileSize(), 0, 15));
+    seqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), seqResource1.getTsFileSize(), 0, 15));
+    seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+    TsFileResource unseqResource1 =
+        generateSingleAlignedSeriesFile(
+            "d1",
+            Arrays.asList("s1", "s2"),
+            new TimeRange[] {new TimeRange(21, 24)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+    unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+
+    seqFiles.add(seqResource1);
+    unseqFiles.add(unseqResource1);
+    tsFileManager.addAll(seqFiles, true);
+    tsFileManager.addAll(unseqFiles, false);
+
+    CompactionTaskManager.getInstance().start();
+    InPlaceCrossSpaceCompactionTask t =
+        new InPlaceCrossSpaceCompactionTask(
+            0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
+
+    Assert.assertTrue(worker.processOneCompactionTask(t));
+    validateCompactionResult(
+        t.getSelectedSequenceFiles(),
+        t.getSelectedUnsequenceFiles(),
+        tsFileManager.getTsFileList(true));
+    File targetFile = tsFileManager.getTsFileList(true).get(0).getTsFile();
+    ModificationFile modsFile = tsFileManager.getTsFileList(true).get(0).getModFile();
+    Assert.assertTrue(modsFile.exists());
+    assertDeviceTimeRangeInResource(
+        tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 16, 24);
+    try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
+      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 16, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s2", 16, 24);
+    }
+  }
+
+
+  @Test
+  public void testOneSourceSeqFileOverlappedNonAlignedDeviceHasFullDeletionAndCompactionMods1()
+      throws IOException, IllegalPathException {
+    List<TsFileResource> seqFiles = new ArrayList<>();
+    List<TsFileResource> unseqFiles = new ArrayList<>();
+    TsFileResource seqResource1 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(10, 20)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+    seqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), Long.MIN_VALUE, Long.MAX_VALUE));
+    seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+    TsFileResource unseqResource1 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(21, 24)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+    unseqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), Long.MIN_VALUE, Long.MAX_VALUE));
+    unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+
+    seqFiles.add(seqResource1);
+    unseqFiles.add(unseqResource1);
+    tsFileManager.addAll(seqFiles, true);
+    tsFileManager.addAll(unseqFiles, false);
+
+    CompactionTaskManager.getInstance().start();
+    InPlaceCrossSpaceCompactionTask t =
+        new InPlaceCrossSpaceCompactionTask(
+            0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
+
+    Assert.assertTrue(worker.processOneCompactionTask(t));
+    validateCompactionResult(
+        t.getSelectedSequenceFiles(),
+        t.getSelectedUnsequenceFiles(),
+        tsFileManager.getTsFileList(true));
+    File targetFile = tsFileManager.getTsFileList(true).get(0).getTsFile();
+    ModificationFile modsFile = tsFileManager.getTsFileList(true).get(0).getModFile();
+    Assert.assertTrue(modsFile.exists());
+    assertDeviceTimeRangeInResource(
+        tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 10, 24);
+    try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
+      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", Long.MAX_VALUE, Long.MIN_VALUE);
+    }
+  }
+
+  @Test
+  public void testOneSourceSeqFileOverlappedNonAlignedDeviceHasFullDeletionAndCompactionMods2()
+      throws IOException, IllegalPathException {
+    List<TsFileResource> seqFiles = new ArrayList<>();
+    List<TsFileResource> unseqFiles = new ArrayList<>();
+    TsFileResource seqResource1 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(10, 20)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+    seqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), Long.MAX_VALUE, 10, 20));
+    seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+    TsFileResource unseqResource1 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(15, 24)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+    unseqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), Long.MAX_VALUE, 10, 20));
+    unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+
+    seqFiles.add(seqResource1);
+    unseqFiles.add(unseqResource1);
+    tsFileManager.addAll(seqFiles, true);
+    tsFileManager.addAll(unseqFiles, false);
+
+    CompactionTaskManager.getInstance().start();
+    InPlaceCrossSpaceCompactionTask t =
+        new InPlaceCrossSpaceCompactionTask(
+            0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
+
+    Assert.assertTrue(worker.processOneCompactionTask(t));
+    validateCompactionResult(
+        t.getSelectedSequenceFiles(),
+        t.getSelectedUnsequenceFiles(),
+        tsFileManager.getTsFileList(true));
+    File targetFile = tsFileManager.getTsFileList(true).get(0).getTsFile();
+    ModificationFile modsFile = tsFileManager.getTsFileList(true).get(0).getModFile();
+    Assert.assertTrue(modsFile.exists());
+    assertDeviceTimeRangeInResource(
+        tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 10, 24);
+    try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
+      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 21, 24);
+    }
+  }
+
+  @Test
+  public void testOneSourceSeqFileOverlappedAlignedDeviceHasFullDeletionAndCompactionMods1()
+      throws IOException, IllegalPathException {
+    List<TsFileResource> seqFiles = new ArrayList<>();
+    List<TsFileResource> unseqFiles = new ArrayList<>();
+    TsFileResource seqResource1 =
+        generateSingleAlignedSeriesFile(
+            "d1",
+            Arrays.asList("s1", "s2"),
+            new TimeRange[] {new TimeRange(10, 20)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+    seqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), Long.MIN_VALUE, Long.MAX_VALUE));
+    seqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), seqResource1.getTsFileSize(), Long.MIN_VALUE, Long.MAX_VALUE));
+    seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+    TsFileResource unseqResource1 =
+        generateSingleAlignedSeriesFile(
+            "d1",
+            Arrays.asList("s1", "s2"),
+            new TimeRange[] {new TimeRange(21, 24)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+    unseqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), unseqResource1.getTsFileSize(), Long.MIN_VALUE, Long.MAX_VALUE));
+    unseqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), unseqResource1.getTsFileSize(), Long.MIN_VALUE, Long.MAX_VALUE));
+    unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+
+    seqFiles.add(seqResource1);
+    unseqFiles.add(unseqResource1);
+    tsFileManager.addAll(seqFiles, true);
+    tsFileManager.addAll(unseqFiles, false);
+
+    CompactionTaskManager.getInstance().start();
+    InPlaceCrossSpaceCompactionTask t =
+        new InPlaceCrossSpaceCompactionTask(
+            0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
+
+    Assert.assertTrue(worker.processOneCompactionTask(t));
+    validateCompactionResult(
+        t.getSelectedSequenceFiles(),
+        t.getSelectedUnsequenceFiles(),
+        tsFileManager.getTsFileList(true));
+    File targetFile = tsFileManager.getTsFileList(true).get(0).getTsFile();
+    ModificationFile modsFile = tsFileManager.getTsFileList(true).get(0).getModFile();
+    Assert.assertTrue(modsFile.exists());
+    assertDeviceTimeRangeInResource(
+        tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 10, 24);
+    try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
+      assertAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", Long.MAX_VALUE, Long.MIN_VALUE);
+      assertAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s2", Long.MAX_VALUE, Long.MIN_VALUE);
+    }
+  }
+
+  @Test
+  public void testOneSourceSeqFileOverlappedAlignedDeviceHasFullDeletionAndCompactionMods2()
+      throws IOException, IllegalPathException {
+    List<TsFileResource> seqFiles = new ArrayList<>();
+    List<TsFileResource> unseqFiles = new ArrayList<>();
+    TsFileResource seqResource1 =
+        generateSingleAlignedSeriesFile(
+            "d1",
+            Arrays.asList("s1", "s2"),
+            new TimeRange[] {new TimeRange(10, 20)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+    seqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), 10, 20));
+    seqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), seqResource1.getTsFileSize(), 10, 20));
+    seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+    TsFileResource unseqResource1 =
+        generateSingleAlignedSeriesFile(
+            "d1",
+            Arrays.asList("s1", "s2"),
+            new TimeRange[] {new TimeRange(15, 24)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+    unseqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), unseqResource1.getTsFileSize(), 10, 20));
+    unseqResource1
+        .getCompactionModFile()
+        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), unseqResource1.getTsFileSize(), 10, 20));
+    unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+
+    seqFiles.add(seqResource1);
+    unseqFiles.add(unseqResource1);
+    tsFileManager.addAll(seqFiles, true);
+    tsFileManager.addAll(unseqFiles, false);
+
+    CompactionTaskManager.getInstance().start();
+    InPlaceCrossSpaceCompactionTask t =
+        new InPlaceCrossSpaceCompactionTask(
+            0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
+
+    Assert.assertTrue(worker.processOneCompactionTask(t));
+    validateCompactionResult(
+        t.getSelectedSequenceFiles(),
+        t.getSelectedUnsequenceFiles(),
+        tsFileManager.getTsFileList(true));
+    File targetFile = tsFileManager.getTsFileList(true).get(0).getTsFile();
+    ModificationFile modsFile = tsFileManager.getTsFileList(true).get(0).getModFile();
+    Assert.assertTrue(modsFile.exists());
+    assertDeviceTimeRangeInResource(
+        tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 10, 24);
+    try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
+      assertAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 21, 24);
+      assertAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s2", 21, 24);
     }
   }
 
@@ -929,6 +1498,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
           reader, targetFiles.get(2).getModFile(), "root.testsg.d2", "s1", 10, 89);
     }
   }
+
 
   private TsFileResource generateSingleNonAlignedSeriesFile(
       String device,
