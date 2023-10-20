@@ -39,7 +39,6 @@ import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
 import org.apache.iotdb.tsfile.utils.TsFileUtils;
 
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;

@@ -126,12 +126,14 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 10, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 10, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s1", 10, 24);
     }
   }
 
   @Test
-  public void testOneDeviceAlignedSeriesWithNonOverlappedFiles() throws IOException, IllegalPathException {
+  public void testOneDeviceAlignedSeriesWithNonOverlappedFiles()
+      throws IOException, IllegalPathException {
     List<TsFileResource> seqFiles = new ArrayList<>();
     List<TsFileResource> unseqFiles = new ArrayList<>();
     TsFileResource seqResource1 =
@@ -227,10 +229,10 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 16, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 16, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s1", 16, 24);
     }
   }
-
 
   @Test
   public void testOneSourceSeqFileOverlappedAlignedDeviceHasPartialDeletion()
@@ -283,8 +285,10 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 16, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 16, 24);
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s2", 16, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s1", 16, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s2", 16, 24);
     }
   }
 
@@ -303,7 +307,12 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             true);
     seqResource1
         .getModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), Long.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"),
+                Long.MAX_VALUE,
+                Long.MIN_VALUE,
+                Long.MAX_VALUE));
     seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
     TsFileResource unseqResource1 =
         generateSingleNonAlignedSeriesFile(
@@ -336,7 +345,8 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 21, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 21, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s1", 21, 24);
     }
   }
 
@@ -355,7 +365,12 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             true);
     seqResource1
         .getModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), Long.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"),
+                Long.MAX_VALUE,
+                Long.MIN_VALUE,
+                Long.MAX_VALUE));
     seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
     TsFileResource unseqResource1 =
         generateSingleNonAlignedSeriesFile(
@@ -388,7 +403,8 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 15, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 15, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s1", 15, 24);
     }
   }
 
@@ -407,10 +423,20 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             true);
     seqResource1
         .getModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), Long.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"),
+                Long.MAX_VALUE,
+                Long.MIN_VALUE,
+                Long.MAX_VALUE));
     seqResource1
         .getModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), Long.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s2"),
+                Long.MAX_VALUE,
+                Long.MIN_VALUE,
+                Long.MAX_VALUE));
     seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
     TsFileResource unseqResource1 =
         generateSingleAlignedSeriesFile(
@@ -443,8 +469,10 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 21, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 21, 24);
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s2", 21, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s1", 21, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s2", 21, 24);
     }
   }
 
@@ -463,10 +491,20 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             true);
     seqResource1
         .getModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), Long.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"),
+                Long.MAX_VALUE,
+                Long.MIN_VALUE,
+                Long.MAX_VALUE));
     seqResource1
         .getModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), Long.MAX_VALUE, Long.MIN_VALUE, Long.MAX_VALUE));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s2"),
+                Long.MAX_VALUE,
+                Long.MIN_VALUE,
+                Long.MAX_VALUE));
     seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
     TsFileResource unseqResource1 =
         generateSingleAlignedSeriesFile(
@@ -499,8 +537,10 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 15, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 15, 24);
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s2", 15, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s1", 15, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s2", 15, 24);
     }
   }
 
@@ -519,10 +559,14 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             true);
     seqResource1
         .getModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), 0, 15));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), 0, 15));
     seqResource1
         .getCompactionModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), 0, 15));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), 0, 15));
     seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
     TsFileResource unseqResource1 =
         generateSingleNonAlignedSeriesFile(
@@ -555,7 +599,8 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 16, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 16, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s1", 16, 24);
     }
   }
 
@@ -574,16 +619,24 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             true);
     seqResource1
         .getModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), 0, 15));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), 0, 15));
     seqResource1
         .getModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), seqResource1.getTsFileSize(), 0, 15));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s2"), seqResource1.getTsFileSize(), 0, 15));
     seqResource1
         .getCompactionModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), seqResource1.getTsFileSize(), 0, 15));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s2"), seqResource1.getTsFileSize(), 0, 15));
     seqResource1
         .getCompactionModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), seqResource1.getTsFileSize(), 0, 15));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s2"), seqResource1.getTsFileSize(), 0, 15));
     seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
     TsFileResource unseqResource1 =
         generateSingleAlignedSeriesFile(
@@ -616,11 +669,12 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 16, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 16, 24);
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s2", 16, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s1", 16, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s2", 16, 24);
     }
   }
-
 
   @Test
   public void testOneSourceSeqFileOverlappedNonAlignedDeviceHasFullDeletionAndCompactionMods1()
@@ -637,7 +691,12 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             true);
     seqResource1
         .getCompactionModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), Long.MIN_VALUE, Long.MAX_VALUE));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"),
+                seqResource1.getTsFileSize(),
+                Long.MIN_VALUE,
+                Long.MAX_VALUE));
     seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
     TsFileResource unseqResource1 =
         generateSingleNonAlignedSeriesFile(
@@ -649,7 +708,12 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             false);
     unseqResource1
         .getCompactionModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), Long.MIN_VALUE, Long.MAX_VALUE));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"),
+                seqResource1.getTsFileSize(),
+                Long.MIN_VALUE,
+                Long.MAX_VALUE));
     unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
 
     seqFiles.add(seqResource1);
@@ -673,7 +737,8 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 10, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", Long.MAX_VALUE, Long.MIN_VALUE);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s1", Long.MAX_VALUE, Long.MIN_VALUE);
     }
   }
 
@@ -728,7 +793,8 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 10, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 21, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s1", 21, 24);
     }
   }
 
@@ -747,10 +813,20 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             true);
     seqResource1
         .getCompactionModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), Long.MIN_VALUE, Long.MAX_VALUE));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"),
+                seqResource1.getTsFileSize(),
+                Long.MIN_VALUE,
+                Long.MAX_VALUE));
     seqResource1
         .getCompactionModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), seqResource1.getTsFileSize(), Long.MIN_VALUE, Long.MAX_VALUE));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s2"),
+                seqResource1.getTsFileSize(),
+                Long.MIN_VALUE,
+                Long.MAX_VALUE));
     seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
     TsFileResource unseqResource1 =
         generateSingleAlignedSeriesFile(
@@ -762,10 +838,20 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             false);
     unseqResource1
         .getCompactionModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), unseqResource1.getTsFileSize(), Long.MIN_VALUE, Long.MAX_VALUE));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"),
+                unseqResource1.getTsFileSize(),
+                Long.MIN_VALUE,
+                Long.MAX_VALUE));
     unseqResource1
         .getCompactionModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), unseqResource1.getTsFileSize(), Long.MIN_VALUE, Long.MAX_VALUE));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s2"),
+                unseqResource1.getTsFileSize(),
+                Long.MIN_VALUE,
+                Long.MAX_VALUE));
     unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
 
     seqFiles.add(seqResource1);
@@ -789,8 +875,10 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 10, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
-      assertAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", Long.MAX_VALUE, Long.MIN_VALUE);
-      assertAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s2", Long.MAX_VALUE, Long.MIN_VALUE);
+      assertAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s1", Long.MAX_VALUE, Long.MIN_VALUE);
+      assertAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s2", Long.MAX_VALUE, Long.MIN_VALUE);
     }
   }
 
@@ -809,10 +897,14 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             true);
     seqResource1
         .getCompactionModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), 10, 20));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"), seqResource1.getTsFileSize(), 10, 20));
     seqResource1
         .getCompactionModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), seqResource1.getTsFileSize(), 10, 20));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s2"), seqResource1.getTsFileSize(), 10, 20));
     seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
     TsFileResource unseqResource1 =
         generateSingleAlignedSeriesFile(
@@ -824,10 +916,14 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
             false);
     unseqResource1
         .getCompactionModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s1"), unseqResource1.getTsFileSize(), 10, 20));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"), unseqResource1.getTsFileSize(), 10, 20));
     unseqResource1
         .getCompactionModFile()
-        .write(new Deletion(new PartialPath("root.testsg.d1", "s2"), unseqResource1.getTsFileSize(), 10, 20));
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s2"), unseqResource1.getTsFileSize(), 10, 20));
     unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
 
     seqFiles.add(seqResource1);
@@ -907,8 +1003,10 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d2", 21, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d1", "s1", 16, 20);
-      assertNonAlignedMeasurementTimeRangeInTsFile(reader, modsFile, "root.testsg.d2", "s1", 21, 24);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d1", "s1", 16, 20);
+      assertNonAlignedMeasurementTimeRangeInTsFile(
+          reader, modsFile, "root.testsg.d2", "s1", 21, 24);
     }
   }
 
@@ -975,7 +1073,8 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
   }
 
   @Test
-  public void testDifferentDeviceAlignedSeriesWithNonOverlappedFiles() throws IOException, IllegalPathException {
+  public void testDifferentDeviceAlignedSeriesWithNonOverlappedFiles()
+      throws IOException, IllegalPathException {
     List<TsFileResource> seqFiles = new ArrayList<>();
     List<TsFileResource> unseqFiles = new ArrayList<>();
     TsFileResource seqResource1 =
@@ -1499,7 +1598,6 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     }
   }
 
-
   private TsFileResource generateSingleNonAlignedSeriesFile(
       String device,
       String measurement,
@@ -1631,37 +1729,38 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
     for (IChunkMetadata iChunkMetadata : chunkMetadataList.get(0).getValueChunkMetadataList()) {
       List<Modification> measurementMods = new ArrayList<>();
       for (Modification modification : modsFile.getModifications()) {
-        if (modification.getPath().matchFullPath(new PartialPath(deviceId, iChunkMetadata.getMeasurementUid()))) {
+        if (modification
+            .getPath()
+            .matchFullPath(new PartialPath(deviceId, iChunkMetadata.getMeasurementUid()))) {
           measurementMods.add(modification);
         }
       }
       measurementModificationLists.add(measurementMods);
     }
-    ModificationUtils.modifyAlignedChunkMetaData(
-        chunkMetadataList, measurementModificationLists);
+    ModificationUtils.modifyAlignedChunkMetaData(chunkMetadataList, measurementModificationLists);
     for (AlignedChunkMetadata chunkMetadata : chunkMetadataList) {
       if (!chunkMetadata.isModified()) {
         startTimeInMetadata = Math.min(startTimeInMetadata, chunkMetadata.getStartTime());
         endTimeInMetadata = Math.max(endTimeInMetadata, chunkMetadata.getEndTime());
         continue;
       }
-        Chunk timeChunk = reader.readMemChunk((ChunkMetadata) chunkMetadata.getTimeChunkMetadata());
-        List<Chunk> valueChunks = new ArrayList<>();
-        for (IChunkMetadata valueChunkMetadata : chunkMetadata.getValueChunkMetadataList()) {
-          valueChunks.add(reader.readMemChunk((ChunkMetadata) valueChunkMetadata));
-        }
+      Chunk timeChunk = reader.readMemChunk((ChunkMetadata) chunkMetadata.getTimeChunkMetadata());
+      List<Chunk> valueChunks = new ArrayList<>();
+      for (IChunkMetadata valueChunkMetadata : chunkMetadata.getValueChunkMetadataList()) {
+        valueChunks.add(reader.readMemChunk((ChunkMetadata) valueChunkMetadata));
+      }
 
-        AlignedChunkReader chunkReader = new AlignedChunkReader(timeChunk, valueChunks, null, true);
-        while (chunkReader.hasNextSatisfiedPage()) {
-          BatchData batchData = chunkReader.nextPageData();
-          while (batchData.hasCurrent()) {
-            startTimeInMetadata = Math.min(startTimeInMetadata, batchData.currentTime());
-            endTimeInMetadata = Math.max(endTimeInMetadata, batchData.currentTime());
-            pointNumOfDeviceInFile++;
-            batchData.next();
-          }
+      AlignedChunkReader chunkReader = new AlignedChunkReader(timeChunk, valueChunks, null, true);
+      while (chunkReader.hasNextSatisfiedPage()) {
+        BatchData batchData = chunkReader.nextPageData();
+        while (batchData.hasCurrent()) {
+          startTimeInMetadata = Math.min(startTimeInMetadata, batchData.currentTime());
+          endTimeInMetadata = Math.max(endTimeInMetadata, batchData.currentTime());
+          pointNumOfDeviceInFile++;
+          batchData.next();
         }
       }
+    }
     Assert.assertEquals(startTime, startTimeInMetadata);
     Assert.assertEquals(endTime, endTimeInMetadata);
   }

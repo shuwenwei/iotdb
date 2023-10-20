@@ -71,7 +71,8 @@ public abstract class AbstractCrossSpaceCompactionTask extends AbstractCompactio
       TsFileManager tsFileManager,
       long serialId,
       CompactionTaskType compactionTaskType) {
-    super(storageGroupName, dataRegionId, timePartition, tsFileManager, serialId, compactionTaskType);
+    super(
+        storageGroupName, dataRegionId, timePartition, tsFileManager, serialId, compactionTaskType);
   }
 
   public List<TsFileResource> getSelectedSequenceFiles() {

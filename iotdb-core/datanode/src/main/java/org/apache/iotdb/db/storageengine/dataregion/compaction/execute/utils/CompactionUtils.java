@@ -171,7 +171,8 @@ public class CompactionUtils {
       throws IOException, IllegalPathException {
     Set<Modification> modifications = new HashSet<>();
     for (TsFileResource unseqFile : unseqResources) {
-      for (Modification modification : ModificationFile.getCompactionMods(unseqFile).getModifications()) {
+      for (Modification modification :
+          ModificationFile.getCompactionMods(unseqFile).getModifications()) {
         modification.setFileOffset(Long.MAX_VALUE);
         modifications.add(modification);
       }
@@ -186,7 +187,8 @@ public class CompactionUtils {
         long newOffset = Math.min(dataSizeBeforeCompaction, seqModification.getFileOffset());
         seqModification.setFileOffset(newOffset);
       }
-      for (Modification seqCompactionModification : ModificationFile.getCompactionMods(seqFile).getModifications()) {
+      for (Modification seqCompactionModification :
+          ModificationFile.getCompactionMods(seqFile).getModifications()) {
         seqCompactionModification.setFileOffset(Long.MAX_VALUE);
         seqModifications.add(seqCompactionModification);
       }
