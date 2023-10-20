@@ -225,6 +225,11 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
     }
   }
 
+  @Override
+  protected void recover() {
+
+  }
+
   private void recordLogBeforeDoingCompaction(CompactionLogger logger)
       throws InPlaceCompactionErrorException {
     try {
