@@ -72,16 +72,16 @@ public class CompactionLogger implements AutoCloseable {
 
   public void logFile(TsFileResource tsFile, String flag, long dataSize, long metaSize)
       throws IOException {
-    logStream.write(
+    String log =
         flag
             + TsFileIdentifier.INFO_SEPARATOR
             + TsFileIdentifier.getFileIdentifierFromFilePath(tsFile.getTsFile().getAbsolutePath())
-                .toString()
             + TsFileIdentifier.INFO_SEPARATOR
             + dataSize
             + TsFileIdentifier.INFO_SEPARATOR
-            + metaSize);
-    logStream.newLine();
+            + metaSize;
+    logStream.write(log.getBytes());
+    logStream.write(System.lineSeparator().getBytes());
     logStream.flush();
   }
 

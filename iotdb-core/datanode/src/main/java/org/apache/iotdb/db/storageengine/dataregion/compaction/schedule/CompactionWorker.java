@@ -78,7 +78,7 @@ public class CompactionWorker implements Runnable {
       if (!task.isDiskSpaceCheckPassed()) {
         log.debug(
             "Compaction task start check failed because disk free ratio is less than disk_space_warning_threshold");
-        return;
+        return false;
       }
       task.transitSourceFilesToMerging();
       if (IoTDBDescriptor.getInstance().getConfig().isEnableCompactionMemControl()) {
