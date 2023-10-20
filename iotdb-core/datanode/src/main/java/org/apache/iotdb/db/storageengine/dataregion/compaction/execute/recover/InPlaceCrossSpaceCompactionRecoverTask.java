@@ -72,7 +72,7 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
         compactionLogFile);
     CompactionLogAnalyzer logAnalyzer = new CompactionLogAnalyzer(compactionLogFile);
     try {
-      logAnalyzer.analyzeInPlaceCrossSpaceCompactionLog();
+      logAnalyzer.analyze();
     } catch (IOException e) {
       logger.error(
           "{} [Compaction][Recover] failed to analyze compaction log file {}, abort recover",

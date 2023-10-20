@@ -64,6 +64,16 @@ public abstract class AbstractCrossSpaceCompactionTask extends AbstractCompactio
     createSummary();
   }
 
+  protected AbstractCrossSpaceCompactionTask(
+      String storageGroupName,
+      String dataRegionId,
+      long timePartition,
+      TsFileManager tsFileManager,
+      long serialId,
+      CompactionTaskType compactionTaskType) {
+    super(storageGroupName, dataRegionId, timePartition, tsFileManager, serialId, compactionTaskType);
+  }
+
   public List<TsFileResource> getSelectedSequenceFiles() {
     return selectedSequenceFiles;
   }

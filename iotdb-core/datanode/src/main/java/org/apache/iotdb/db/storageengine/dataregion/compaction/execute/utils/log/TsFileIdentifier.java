@@ -56,12 +56,6 @@ public class TsFileIdentifier {
   public static final int SPLIT_FILE_DATA_SIZE_OFFSET_IN_LOG = 5;
   public static final int SPLIT_FILE_METADATA_SIZE_OFFSET_IN_LOG = 6;
 
-  private static final int LOGICAL_SG_OFFSET_IN_LOG_FROM_OLD = 0;
-  private static final int DATA_REGION_OFFSET_IN_LOG_FROM_OLD = 1;
-  private static final int TIME_PARTITION_OFFSET_IN_LOG_FROM_OLD = 2;
-  private static final int FILE_NAME_OFFSET_IN_LOG_FROM_OLD = 3;
-  private static final int SEQUENCE_OFFSET_IN_LOG_FROM_OLD = 4;
-
   private static final String SEQUENCE_STR = "sequence";
   private static final String UNSEQUENCE_STR = "unsequence";
 
@@ -153,30 +147,6 @@ public class TsFileIdentifier {
       throw new RuntimeException(
           String.format("String %s is not a legal file info string", infoString));
     }
-  }
-
-  /**
-   * This function generates an instance of CompactionFileIdentifier by parsing the old info string
-   * from previous version (<0.13) of a tsfile(usually recorded in a compaction.log). Such as
-   * “root.test.sg 0 0 1-1-0-0.tsfile true" from old cross space compaction log and "root.test.sg 0
-   * 0 1-1-0-0.tsfile sequence" from old inner space compaction log.
-   */
-  public static TsFileIdentifier getFileIdentifierFromOldInfoString(String oldInfoString) {
-    String[] splittedFileInfo = oldInfoString.split(INFO_SEPARATOR);
-    int length = splittedFileInfo.length;
-    if (length != 5) {
-      throw new RuntimeException(
-          String.format(
-              "String %s is not a legal file info string from previous version (<0.13)",
-              oldInfoString));
-    }
-    return new TsFileIdentifier(
-        splittedFileInfo[LOGICAL_SG_OFFSET_IN_LOG_FROM_OLD],
-        splittedFileInfo[DATA_REGION_OFFSET_IN_LOG_FROM_OLD],
-        splittedFileInfo[TIME_PARTITION_OFFSET_IN_LOG_FROM_OLD],
-        splittedFileInfo[SEQUENCE_OFFSET_IN_LOG_FROM_OLD].equals("true")
-            || splittedFileInfo[SEQUENCE_OFFSET_IN_LOG_FROM_OLD].equals(SEQUENCE_STR),
-        splittedFileInfo[FILE_NAME_OFFSET_IN_LOG_FROM_OLD]);
   }
 
   @Override
