@@ -185,6 +185,20 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
     }
   }
 
+  public void calculateEffectiveInfoRatioMap() throws IOException {
+    for (int i = 0; i < targetFiles.size(); i++) {
+      TsFileResource sourceResource = seqFiles.get(i);
+      TsFileResource targetResource = targetFiles.get(i);
+      CompactionTsFileReader reader = (CompactionTsFileReader) readerCacheMap.get(sourceResource);
+      long sourceFileSize = reader.fileSize();
+      long outdatedDataSize = sourceFileSize - reader.getReadDataSize();
+      long targetFileSize = targetResource.getTsFileSize();
+      double effectiveInfoRatio = (double) (targetFileSize - outdatedDataSize) / (targetResource.getTsFileSize());
+      // todo: update the effective info ratio of target TsFileResource
+
+    }
+  }
+
   private void buildDeviceTimeIndexList(List<TsFileResource> resources) throws IOException {
     for (TsFileResource resource : resources) {
       getDeviceTimeIndex(resource);

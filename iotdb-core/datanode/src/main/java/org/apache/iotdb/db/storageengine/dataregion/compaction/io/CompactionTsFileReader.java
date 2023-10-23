@@ -183,6 +183,10 @@ public class CompactionTsFileReader extends TsFileSequenceReader {
         .recordReadInfo(compactionType, CompactionIoDataType.METADATA, dataSize);
   }
 
+  public long getReadDataSize() {
+    return readDataSize.get();
+  }
+
   @Override
   public boolean equals(Object o) {
     return super.equals(o);

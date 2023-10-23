@@ -59,7 +59,7 @@ public class CompactingTsFileInput implements TsFileInput {
   }
 
   @Override
-  public long size() throws IOException {
+  public long size() {
     return dataSize + metadataSize;
   }
 
