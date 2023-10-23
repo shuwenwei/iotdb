@@ -69,6 +69,14 @@ public class DefaultCompactionTaskComparatorImpl implements ICompactionTaskCompa
     // if compactionTaskType of o1 and o2 are different
     // we prefer to execute task type with MOD_SETTLE
     if (o1.getCompactionTaskType() != o2.getCompactionTaskType()) {
+      if (o1.getCompactionTaskType() == CompactionTaskType.MOD_SETTLE) {
+        return -1;
+      } else if (o2.getCompactionTaskType() == CompactionTaskType.MOD_SETTLE) {
+        return 1;
+      } else if (o1.getCompactionTaskType() == CompactionTaskType.IN_PLACE_SETTLE) {
+        return -1;
+      }
+
       return o1.getCompactionTaskType() == CompactionTaskType.MOD_SETTLE ? -1 : 1;
     }
 

@@ -169,6 +169,9 @@ public class SizeTieredCompactionSelector
       if (!taskList.isEmpty()) {
         return taskList;
       }
+
+      List<InnerSpaceCompactionTask> inPlaceTaskList = selectTaskBaseOnEffectiveRatio();
+
       // 2. if a suitable compaction task is not selected in the first step, select the compaction
       // task at the tsFile level
       return selectTaskBaseOnLevel();
@@ -176,6 +179,16 @@ public class SizeTieredCompactionSelector
       LOGGER.error("Exception occurs while selecting files", e);
     }
     return Collections.emptyList();
+  }
+
+  private List<InnerSpaceCompactionTask> selectTaskBaseOnEffectiveRatio() {
+    List<InnerSpaceCompactionTask> taskList = new ArrayList<>();
+    for (TsFileResource tsFileResource : tsFileResources) {
+      taskList.add(
+          createCompactionTask(
+              Collections.singletonList(tsFileResource), CompactionTaskType.IN_PLACE_SETTLE));
+    }
+    return taskList;
   }
 
   private List<InnerSpaceCompactionTask> selectTaskBaseOnLevel() throws IOException {

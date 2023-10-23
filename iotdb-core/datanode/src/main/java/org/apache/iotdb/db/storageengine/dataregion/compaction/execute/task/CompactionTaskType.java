@@ -28,5 +28,11 @@ public enum CompactionTaskType {
    * 2. the TsFile has .mods file and the disk availability rate is lower than the
    * disk_space_warning_threshold.
    */
-  MOD_SETTLE
+  MOD_SETTLE,
+
+  /**
+   * a task of this type is created when the valid information ratio of the TsFile is below a
+   * certain value. Used to collate and merge invalid data in a file
+   */
+  IN_PLACE_SETTLE
 }
