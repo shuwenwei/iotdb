@@ -152,12 +152,12 @@ public class CrossSpaceCompactionCandidate {
 
       // select the `previousSeqFile`
       tmpSplit.addSeqFileIfNotSelected(previousSeqFile);
+      this.overlapDeviceNumber += 1;
       previousSeqFile.markAsSelected();
     }
     // mark candidates in next split as selected even though it may not be added to the final
     // TaskResource
     unseqFile.markAsSelected();
-    this.overlapDeviceNumber += 1;
     nextSplit = tmpSplit;
     nextUnseqFileIndex++;
     return true;
