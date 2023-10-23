@@ -49,6 +49,8 @@ public class CompactionTsFileReader extends TsFileSequenceReader {
   /** Tracks the total amount of data (in bytes) that has been read. */
   private AtomicLong readDataSize = new AtomicLong(0L);
 
+  private AtomicLong effectiveDataSize = new AtomicLong(0L);
+
   /** The type of compaction running. */
   CompactionType compactionType;
 
@@ -104,6 +106,7 @@ public class CompactionTsFileReader extends TsFileSequenceReader {
                   ? CompactionIoDataType.ALIGNED
                   : CompactionIoDataType.NOT_ALIGNED,
               dataSize);
+      effectiveDataSize.addAndGet(dataSize);
       return chunk;
     }
   }
@@ -183,8 +186,8 @@ public class CompactionTsFileReader extends TsFileSequenceReader {
         .recordReadInfo(compactionType, CompactionIoDataType.METADATA, dataSize);
   }
 
-  public long getReadDataSize() {
-    return readDataSize.get();
+  public long getEffectiveDataSize() {
+    return effectiveDataSize.get();
   }
 
   @Override

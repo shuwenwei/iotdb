@@ -164,21 +164,21 @@ public class SizeTieredCompactionSelector
   public List<InnerSpaceCompactionTask> selectInnerSpaceTask(List<TsFileResource> tsFileResources) {
     this.tsFileResources = tsFileResources;
     try {
-      // 1. preferentially select compaction task based on mod file
-      List<InnerSpaceCompactionTask> taskList = selectTaskBaseOnModFile();
+      // 1. select a file based on its valid information ratio
+      List<InnerSpaceCompactionTask> taskList = selectTaskBaseOnEffectiveRatio();
       if (!taskList.isEmpty()) {
         return taskList;
       }
 
-      // 2. if a suitable compaction task is not selected in the first step, select the compaction
-      // task at the tsFile level
-      List<InnerSpaceCompactionTask> levelTaskList = selectTaskBaseOnLevel();
-      if (!levelTaskList.isEmpty()) {
-        return levelTaskList;
+      // 2. preferentially select compaction task based on mod file
+      taskList = selectTaskBaseOnModFile();
+      if (!taskList.isEmpty()) {
+        return taskList;
       }
 
-      // 3. select a file based on its valid information ratio
-      return selectTaskBaseOnEffectiveRatio();
+      // 3. if a suitable compaction task is not selected in the first step, select the compaction
+      // task at the tsFile level
+      return selectTaskBaseOnLevel();
     } catch (Exception e) {
       LOGGER.error("Exception occurs while selecting files", e);
     }

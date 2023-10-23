@@ -155,6 +155,8 @@ public class TsFileResource {
 
   private ProgressIndex maxProgressIndex;
 
+  private double effectiveInfoRatio = 1;
+
   public TsFileResource() {}
 
   public TsFileResource(TsFileResource other) throws IOException {
@@ -304,8 +306,7 @@ public class TsFileResource {
         }
 
         if (blockType == TsFileResourceBlockType.EFFECTIVE_INFO_RATIO) {
-          // todo sww: update effectiveInfoRatio field
-          // effectiveInfoRatio = ReadWriteIOUtils.readDouble(inputStream);
+          effectiveInfoRatio = ReadWriteIOUtils.readDouble(inputStream);
         }
       }
     }
@@ -1171,8 +1172,10 @@ public class TsFileResource {
   }
 
   public double getEffectiveInfoRatio() {
-    return 0;
+    return effectiveInfoRatio;
   }
 
-  public void setEffectiveInfoRatio(double ratio) {}
+  public void setEffectiveInfoRatio(double ratio) {
+    this.effectiveInfoRatio = ratio;
+  }
 }
