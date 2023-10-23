@@ -170,11 +170,15 @@ public class SizeTieredCompactionSelector
         return taskList;
       }
 
-      List<InnerSpaceCompactionTask> inPlaceTaskList = selectTaskBaseOnEffectiveRatio();
-
       // 2. if a suitable compaction task is not selected in the first step, select the compaction
       // task at the tsFile level
-      return selectTaskBaseOnLevel();
+      List<InnerSpaceCompactionTask> levelTaskList = selectTaskBaseOnLevel();
+      if (!levelTaskList.isEmpty()) {
+        return levelTaskList;
+      }
+
+      // 3. select a file based on its valid information ratio
+      return selectTaskBaseOnEffectiveRatio();
     } catch (Exception e) {
       LOGGER.error("Exception occurs while selecting files", e);
     }
@@ -184,9 +188,16 @@ public class SizeTieredCompactionSelector
   private List<InnerSpaceCompactionTask> selectTaskBaseOnEffectiveRatio() {
     List<InnerSpaceCompactionTask> taskList = new ArrayList<>();
     for (TsFileResource tsFileResource : tsFileResources) {
-      taskList.add(
-          createCompactionTask(
-              Collections.singletonList(tsFileResource), CompactionTaskType.IN_PLACE_SETTLE));
+      boolean isLowEffectiveInfoRation = tsFileResource.getEffectiveInfoRatio() < 0.5;
+      boolean isLowDiskRatioAndFileRedundancy =
+          !CompactionUtils.isDiskHasSpace(DISK_REDUNDANCY)
+              && tsFileResource.getEffectiveInfoRatio() < 1;
+
+      if (isLowEffectiveInfoRation || isLowDiskRatioAndFileRedundancy) {
+        taskList.add(
+            createCompactionTask(
+                Collections.singletonList(tsFileResource), CompactionTaskType.IN_PLACE_SETTLE));
+      }
     }
     return taskList;
   }

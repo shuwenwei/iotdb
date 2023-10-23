@@ -23,7 +23,6 @@ import org.apache.iotdb.db.conf.IoTDBConfig;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCrossSpaceCompactionTask;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CompactionTaskType;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InnerSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.constant.CompactionPriority;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
@@ -69,15 +68,9 @@ public class DefaultCompactionTaskComparatorImpl implements ICompactionTaskCompa
     // if compactionTaskType of o1 and o2 are different
     // we prefer to execute task type with MOD_SETTLE
     if (o1.getCompactionTaskType() != o2.getCompactionTaskType()) {
-      if (o1.getCompactionTaskType() == CompactionTaskType.MOD_SETTLE) {
-        return -1;
-      } else if (o2.getCompactionTaskType() == CompactionTaskType.MOD_SETTLE) {
-        return 1;
-      } else if (o1.getCompactionTaskType() == CompactionTaskType.IN_PLACE_SETTLE) {
-        return -1;
-      }
-
-      return o1.getCompactionTaskType() == CompactionTaskType.MOD_SETTLE ? -1 : 1;
+      return Integer.compare(
+          o2.getCompactionTaskType().getExecutePriority(),
+          o1.getCompactionTaskType().getExecutePriority());
     }
 
     // if max mods file size of o1 and o2 are different
