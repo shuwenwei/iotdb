@@ -159,6 +159,8 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
 
       // >>> 删除已经用完的源文件及其附属文件，顺序文件已经被重命名，不需要执行删除
       removeRemainingSourceFiles();
+      updateMetricsWithTargetFiles();
+
       // <<< 删除已经用完的源文件及其附属文件
       CompactionMetrics.getInstance().recordSummaryInfo(summary);
 
@@ -425,6 +427,22 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
       CompactionUtils.deleteCompactionModsFile(selectedSequenceFiles, selectedUnsequenceFiles);
     } catch (Exception e) {
       throw new InPlaceCompactionCleanupException("failed to remove remaining source files", e);
+    }
+  }
+
+  private void updateMetricsWithTargetFiles() {
+    for (TsFileResource targetResource : targetFiles) {
+      FileMetrics.getInstance()
+          .addTsFile(
+              targetResource.getDatabaseName(),
+              targetResource.getDataRegionId(),
+              targetResource.getTsFileSize(),
+              true,
+              targetResource.getTsFile().getName());
+      if (targetResource.getModFile().exists()) {
+        FileMetrics.getInstance().increaseModFileNum(1);
+        FileMetrics.getInstance().increaseModFileSize(targetResource.getModFile().getSize());
+      }
     }
   }
 
