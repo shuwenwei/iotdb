@@ -272,9 +272,11 @@ public class TsFileResource {
     if (maxProgressIndex != null) {
       TsFileResourceBlockType.PROGRESS_INDEX.serialize(outputStream);
       maxProgressIndex.serialize(outputStream);
-    } else {
-      TsFileResourceBlockType.EMPTY_BLOCK.serialize(outputStream);
     }
+
+    // serialize tsfile effective info ratio , use for inplace compaction
+    TsFileResourceBlockType.EFFECTIVE_INFO_RATIO.serialize(outputStream);
+    ReadWriteIOUtils.write(getEffectiveInfoRatio(), outputStream);
   }
 
   /** deserialize from disk */
@@ -299,6 +301,11 @@ public class TsFileResource {
             TsFileResourceBlockType.deserialize(ReadWriteIOUtils.readByte(inputStream));
         if (blockType == TsFileResourceBlockType.PROGRESS_INDEX) {
           maxProgressIndex = ProgressIndexType.deserializeFrom(inputStream);
+        }
+
+        if (blockType == TsFileResourceBlockType.EFFECTIVE_INFO_RATIO) {
+          // todo sww: update effectiveInfoRatio field
+          // effectiveInfoRatio = ReadWriteIOUtils.readDouble(inputStream);
         }
       }
     }

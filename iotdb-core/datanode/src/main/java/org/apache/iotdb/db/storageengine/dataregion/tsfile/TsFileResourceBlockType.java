@@ -27,7 +27,7 @@ import java.io.OutputStream;
 public enum TsFileResourceBlockType {
   EMPTY_BLOCK((byte) 0),
   PROGRESS_INDEX((byte) 1),
-  ;
+  EFFECTIVE_INFO_RATIO((byte) 2);
 
   private final byte type;
 
@@ -45,6 +45,8 @@ public enum TsFileResourceBlockType {
         return EMPTY_BLOCK;
       case 1:
         return PROGRESS_INDEX;
+      case 2:
+        return EFFECTIVE_INFO_RATIO;
       default:
         throw new IllegalArgumentException("Invalid input: " + type);
     }
