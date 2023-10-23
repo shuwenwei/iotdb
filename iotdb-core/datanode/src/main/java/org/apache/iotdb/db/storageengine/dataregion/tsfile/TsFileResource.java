@@ -1205,4 +1205,10 @@ public class TsFileResource {
   public String getDataRegionId() {
     return file.getParentFile().getParentFile().getName();
   }
+
+  public double getEffectiveInfoRatio() {
+    return 0;
+  }
+
+  public void setEffectiveInfoRatio(double ratio) {}
 }

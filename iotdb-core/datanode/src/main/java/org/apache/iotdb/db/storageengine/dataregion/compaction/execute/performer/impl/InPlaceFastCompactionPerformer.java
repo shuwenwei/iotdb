@@ -194,10 +194,9 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
       long sourceFileSize = reader.fileSize();
       long outdatedDataSize = sourceFileSize - reader.getReadDataSize();
       long targetFileSize = targetResource.getTsFileSize();
-      double effectiveInfoRatio =
-          (double) (targetFileSize - outdatedDataSize) / (targetResource.getTsFileSize());
+      double effectiveInfoRatio = (double) (targetFileSize - outdatedDataSize) / (targetFileSize);
       // todo: update the effective info ratio of target TsFileResource
-
+      targetResource.setEffectiveInfoRatio(effectiveInfoRatio);
     }
   }
 
