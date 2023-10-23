@@ -153,6 +153,10 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
 
       atomicReplace();
 
+      // acquire write lock of source seq files to wait all reading process finish
+      acquireWriteLock(inPlaceCompactionSeqFiles);
+      acquireWriteLock(inPlaceCompactionUnSeqFiles);
+
       // >>> 删除已经用完的源文件及其附属文件，顺序文件已经被重命名，不需要执行删除
       removeRemainingSourceFiles();
       // <<< 删除已经用完的源文件及其附属文件
@@ -290,10 +294,6 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
           TsFileResourceManager.getInstance().registerSealedTsFileResource(resource);
         }
       }
-
-      // acquire write lock of source seq files to wait all reading process finish
-      acquireWriteLock(inPlaceCompactionSeqFiles);
-      acquireWriteLock(inPlaceCompactionUnSeqFiles);
 
       // close the special reader and remove it from FileReaderManager
       for (InPlaceCompactionSeqFile seqFile : inPlaceCompactionSeqFiles) {
