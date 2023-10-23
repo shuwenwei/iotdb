@@ -20,13 +20,20 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.selector.utils;
 
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
+import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class CrossCompactionTaskResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TsFileResource.class);
+
   private List<TsFileResource> seqFiles;
   private List<TsFileResource> unseqFiles;
 
@@ -36,12 +43,18 @@ public class CrossCompactionTaskResource {
   private float totalUnseqFileSize;
   private long totalFileNums;
 
+  private boolean isContainsLevelZeroFiles;
+
+  private double overlapRatio;
+
   public CrossCompactionTaskResource() {
     this.seqFiles = new ArrayList<>();
     this.unseqFiles = new ArrayList<>();
     this.totalMemoryCost = 0L;
     this.totalFileSize = 0L;
     this.totalFileNums = 0L;
+    this.isContainsLevelZeroFiles = false;
+    this.overlapRatio = 1;
   }
 
   public List<TsFileResource> getSeqFiles() {
@@ -86,6 +99,22 @@ public class CrossCompactionTaskResource {
     seqFiles.add(file);
     totalSeqFileSize += file.getTsFileSize();
     countStatistic(file);
+    checkIsContainsLevelZeroFile(file);
+  }
+
+  private void checkIsContainsLevelZeroFile(TsFileResource file) {
+    try {
+      if (!isContainsLevelZeroFiles) {
+        TsFileNameGenerator.TsFileName tsFileName =
+            TsFileNameGenerator.getTsFileName(file.getTsFile().getName());
+        if (tsFileName.getInnerCompactionCnt() == 0) {
+          isContainsLevelZeroFiles = true;
+        }
+      }
+
+    } catch (IOException e) {
+      LOGGER.error("parse file name error : {}.", file.getTsFile().getName());
+    }
   }
 
   private void updateMemoryCost(long newMemoryCost) {
@@ -127,5 +156,17 @@ public class CrossCompactionTaskResource {
     // It should be changed once the task execution is optimized.
     // See https://issues.apache.org/jira/browse/IOTDB-5263
     return !unseqFiles.isEmpty() && !seqFiles.isEmpty();
+  }
+
+  public boolean isContainsLevelZeroFiles() {
+    return isContainsLevelZeroFiles;
+  }
+
+  public double getOverlapRatio() {
+    return overlapRatio;
+  }
+
+  public void setOverlapRatio(double overlapRatio) {
+    this.overlapRatio = overlapRatio;
   }
 }

@@ -34,7 +34,10 @@ public enum CompactionTaskType {
    * a task of this type is created when the valid information ratio of the TsFile is below a
    * certain value. Used to collate and merge invalid data in a file
    */
-  IN_PLACE_SETTLE(30);
+  IN_PLACE_SETTLE(30),
+
+  /** use for cross InPlace compaction task */
+  IN_PLACE(10);
 
   /** the larger the value, the sooner it is executed */
   final int executePriority;

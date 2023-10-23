@@ -28,6 +28,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCrossSpaceCompactionTask;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CompactionTaskType;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.InPlaceFastCompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.CompactionLogger;
@@ -71,7 +72,8 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
         selectedUnsequenceFiles,
         performer,
         memoryCost,
-        serialId);
+        serialId,
+        CompactionTaskType.IN_PLACE);
     // generate a copy of all source seq TsFileResource in memory
     this.targetFiles =
         selectedSequenceFiles.stream()

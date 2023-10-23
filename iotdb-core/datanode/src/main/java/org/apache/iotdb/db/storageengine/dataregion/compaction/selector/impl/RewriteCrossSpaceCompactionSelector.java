@@ -196,6 +196,10 @@ public class RewriteCrossSpaceCompactionSelector implements ICrossSpaceSelector 
           taskResource.getTotalMemoryCost());
     }
     taskResource.sortSeqFiles(candidate.getSeqFiles());
+    taskResource.setOverlapRatio(
+        (double) candidate.getOverlapDeviceNumber()
+            * candidate.getUnseqFiles().size()
+            / candidate.getAllDeviceNumber());
     return taskResource;
   }
 

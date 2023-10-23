@@ -43,6 +43,9 @@ public class CrossSpaceCompactionCandidate {
   private CrossCompactionTaskResourceSplit nextSplit;
   private long ttlLowerBound = Long.MIN_VALUE;
 
+  public int allDeviceNumber;
+  public int overlapDeviceNumber;
+
   public CrossSpaceCompactionCandidate(
       List<TsFileResource> seqFiles, List<TsFileResource> unseqFiles) {
     init(seqFiles, unseqFiles);
@@ -99,6 +102,7 @@ public class CrossSpaceCompactionCandidate {
         if (!seqFile.containsDevice(deviceId)) {
           continue;
         }
+
         DeviceInfo seqDeviceInfo = seqFile.getDeviceInfoById(deviceId);
 
         // If the unsealed file is unclosed, the file should not be selected only when its startTime
@@ -112,11 +116,13 @@ public class CrossSpaceCompactionCandidate {
           // avoid duplication selection
           tmpSplit.addSeqFileIfNotSelected(seqFile);
           seqFile.markAsSelected();
+          this.overlapDeviceNumber += 1;
           atLeastOneSeqFileSelected = true;
           break;
         } else if (unseqDeviceInfo.startTime <= seqDeviceInfo.endTime) {
           tmpSplit.addSeqFileIfNotSelected(seqFile);
           seqFile.markAsSelected();
+          this.overlapDeviceNumber += 1;
           atLeastOneSeqFileSelected = true;
         } else {
           if (!seqFile.unsealed()) {
@@ -151,6 +157,7 @@ public class CrossSpaceCompactionCandidate {
     // mark candidates in next split as selected even though it may not be added to the final
     // TaskResource
     unseqFile.markAsSelected();
+    this.overlapDeviceNumber += 1;
     nextSplit = tmpSplit;
     nextUnseqFileIndex++;
     return true;
@@ -159,6 +166,7 @@ public class CrossSpaceCompactionCandidate {
   private List<TsFileResourceCandidate> copySeqResource(List<TsFileResource> seqFiles) {
     List<TsFileResourceCandidate> ret = new ArrayList<>();
     for (TsFileResource resource : seqFiles) {
+      this.allDeviceNumber += resource.getDevices().size();
       ret.add(new TsFileResourceCandidate(resource));
     }
     return ret;
@@ -233,6 +241,14 @@ public class CrossSpaceCompactionCandidate {
       }
       this.atLeastOneSeqFileSelected = true;
     }
+  }
+
+  public int getAllDeviceNumber() {
+    return allDeviceNumber;
+  }
+
+  public int getOverlapDeviceNumber() {
+    return overlapDeviceNumber;
   }
 
   public static class TsFileResourceCandidate {
