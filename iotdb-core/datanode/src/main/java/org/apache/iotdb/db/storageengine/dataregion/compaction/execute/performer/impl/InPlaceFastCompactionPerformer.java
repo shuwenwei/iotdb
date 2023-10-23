@@ -178,6 +178,7 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
       CompactionUtils.updatePlanIndexes(targetFiles, seqFiles, unseqFiles);
       subTaskSummary.setChunkGroupNoneOverlap(chunkGroupNonOverlapNum);
       subTaskSummary.setRewriteChunkGroupNum(chunkGroupOverlapNum);
+      calculateEffectiveInfoRatioOfTargetResources();
     } finally {
       this.modificationCache = null;
       this.deviceTimeIndexMap = null;
@@ -185,7 +186,7 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
     }
   }
 
-  public void calculateEffectiveInfoRatioMap() throws IOException {
+  private void calculateEffectiveInfoRatioOfTargetResources() throws IOException {
     for (int i = 0; i < targetFiles.size(); i++) {
       TsFileResource sourceResource = seqFiles.get(i);
       TsFileResource targetResource = targetFiles.get(i);
@@ -193,7 +194,8 @@ public class InPlaceFastCompactionPerformer implements ICrossCompactionPerformer
       long sourceFileSize = reader.fileSize();
       long outdatedDataSize = sourceFileSize - reader.getReadDataSize();
       long targetFileSize = targetResource.getTsFileSize();
-      double effectiveInfoRatio = (double) (targetFileSize - outdatedDataSize) / (targetResource.getTsFileSize());
+      double effectiveInfoRatio =
+          (double) (targetFileSize - outdatedDataSize) / (targetResource.getTsFileSize());
       // todo: update the effective info ratio of target TsFileResource
 
     }
