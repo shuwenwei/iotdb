@@ -209,10 +209,44 @@ public class AbstractCompactionTest {
       boolean isAlign,
       boolean isSeq)
       throws IOException, WriteProcessException, MetadataException {
+    createFiles(
+        fileNum,
+        deviceNum,
+        measurementNum,
+        pointNum,
+        startTime,
+        startValue,
+        timeInterval,
+        valueInterval,
+        isAlign,
+        isSeq,
+        1,
+        0);
+  }
+
+  protected void createFiles(
+      int fileNum,
+      int deviceNum,
+      int measurementNum,
+      int pointNum,
+      int startTime,
+      int startValue,
+      int timeInterval,
+      int valueInterval,
+      boolean isAlign,
+      boolean isSeq,
+      double effectiveInfoRatio,
+      int innerCompactionCount)
+      throws IOException, WriteProcessException, MetadataException {
     for (int i = 0; i < fileNum; i++) {
       fileVersion = isSeq ? seqVersion[fileCount] : unseqVersion[fileCount];
       String fileName =
-          timestamp[fileCount++] + FilePathUtils.FILE_NAME_SEPARATOR + fileVersion + "-0-0.tsfile";
+          timestamp[fileCount++]
+              + FilePathUtils.FILE_NAME_SEPARATOR
+              + fileVersion
+              + "-"
+              + innerCompactionCount
+              + "-0.tsfile";
       String filePath;
       if (isSeq) {
         filePath = SEQ_DIRS.getPath() + File.separator + fileName;
@@ -249,7 +283,8 @@ public class AbstractCompactionTest {
           startTime + pointNum * i + timeInterval * i,
           startTime + pointNum * i + timeInterval * i + pointNum - 1,
           isAlign,
-          isSeq);
+          isSeq,
+          effectiveInfoRatio);
     }
     // sleep a few milliseconds to avoid generating files with same timestamps
     try {
@@ -344,7 +379,13 @@ public class AbstractCompactionTest {
   }
 
   private void addResource(
-      File file, int deviceNum, long startTime, long endTime, boolean isAlign, boolean isSeq)
+      File file,
+      int deviceNum,
+      long startTime,
+      long endTime,
+      boolean isAlign,
+      boolean isSeq,
+      double effectiveRatio)
       throws IOException {
     TsFileResource resource = new TsFileResource(file);
     int deviceStartindex = isAlign ? TsFileGeneratorUtils.getAlignDeviceOffset() : 0;
@@ -356,12 +397,19 @@ public class AbstractCompactionTest {
 
     resource.updatePlanIndexes(fileVersion);
     resource.setStatusForTest(TsFileResourceStatus.NORMAL);
+    resource.setEffectiveInfoRatio(effectiveRatio);
     resource.serialize();
     if (isSeq) {
       seqResources.add(resource);
     } else {
       unseqResources.add(resource);
     }
+  }
+
+  private void addResource(
+      File file, int deviceNum, long startTime, long endTime, boolean isAlign, boolean isSeq)
+      throws IOException {
+    addResource(file, deviceNum, startTime, endTime, isAlign, isSeq, 1.0);
   }
 
   protected void registerTimeseriesInMManger(int deviceNum, int measurementNum, boolean isAligned)
