@@ -200,7 +200,8 @@ public class TsFileNameGenerator {
       // set target resource to COMPACTING until the end of this task
       targetFileResources.add(
           new TsFileResource(
-              getCrossSpaceCompactionTargetFile(resource, isTempFile), TsFileResourceStatus.COMPACTING));
+              getCrossSpaceCompactionTargetFile(resource, isTempFile),
+              TsFileResourceStatus.COMPACTING));
     }
     return targetFileResources;
   }

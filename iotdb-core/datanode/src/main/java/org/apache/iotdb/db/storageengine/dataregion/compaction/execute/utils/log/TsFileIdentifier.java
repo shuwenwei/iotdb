@@ -209,7 +209,6 @@ public class TsFileIdentifier {
     return null;
   }
 
-
   public File getFileFromDataDirsIfAnyAdjuvantFileExists() {
     String[] dataDirs = IoTDBDescriptor.getInstance().getConfig().getDataDirs();
     String partialFileString =
@@ -224,7 +223,13 @@ public class TsFileIdentifier {
             + filename;
     for (String dataDir : dataDirs) {
       File file = FSFactoryProducer.getFSFactory().getFile(dataDir, partialFileString);
-      if (file.exists() || new File(file.getAbsolutePath() + TsFileResource.RESOURCE_SUFFIX).exists() || new File(file.getAbsolutePath() + ModificationFile.FILE_SUFFIX).exists()) {
+      if (file.exists()
+          || new File(file.getAbsolutePath() + TsFileResource.RESOURCE_SUFFIX).exists()
+          || new File(file.getAbsolutePath() + ModificationFile.FILE_SUFFIX).exists()
+          || new File(
+                  file.getAbsolutePath()
+                      + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX)
+              .exists()) {
         return file;
       }
     }

@@ -217,7 +217,9 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
   }
 
   private void handleWithSomeSourceFileLost(
-      List<TsFileIdentifier> existSeqFiles, List<TsFileIdentifier> existUnSeqFiles, List<TsFileIdentifier> sourceIdentifiers) {
+      List<TsFileIdentifier> existSeqFiles,
+      List<TsFileIdentifier> existUnSeqFiles,
+      List<TsFileIdentifier> sourceIdentifiers) {
     // 1. remove all source files
     // 2. rename seq files to target file
     try {
@@ -230,6 +232,12 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
         deleteResourceAndModsFile(resource);
       }
       for (TsFileIdentifier identifier : sourceIdentifiers) {
+        if (identifier.isSequence()) {
+          TsFileResource resource = getTsFileResource(identifier);
+          if (resource != null) {
+            deleteMetadataFileIfExists(resource);
+          }
+        }
         deleteResourceAndModsFile(identifier);
       }
     } catch (IOException e) {
@@ -250,6 +258,13 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     resource.getCompactionModFile().remove();
     // delete resource and mods file
     resource.remove();
+  }
+
+  private void deleteMetadataFileIfExists(TsFileResource resource) throws IOException {
+    String metadataFilePath =
+        resource.getTsFile().getAbsolutePath()
+            + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX;
+    Files.deleteIfExists(new File(metadataFilePath).toPath());
   }
 
   private TsFileResource getTsFileResource(TsFileIdentifier identifier) {
