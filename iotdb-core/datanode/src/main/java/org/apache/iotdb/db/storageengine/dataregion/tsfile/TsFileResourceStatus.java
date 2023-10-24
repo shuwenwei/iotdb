@@ -26,5 +26,10 @@ public enum TsFileResourceStatus {
   COMPACTING,
   // Indicate that the TsFile is split into data part and meta part during compacting
   SPLIT_DURING_COMPACTING,
+  /**
+   * Indicating the TsFile is prepared to be hard linked. It is seemed as a write operation because
+   * it cannot be modified by other module during hard linking
+   */
+  HARD_LINKING,
   DELETED
 }

@@ -62,9 +62,11 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
               "cannot set TsFileResource to SPLIT_DURING_COMPACTING. File: %s, current status: %s ",
               tsFileResource.getTsFilePath(), tsFileResource.getStatus()));
     }
-    // 4. truncate source file
+    // 4. set dataSize to tsFileResource
+    tsFileResource.setDataSize(this.dataSize);
+    // 5. truncate source file
     truncateSourceFile();
-    // 5. use special TsFileSequenceReader to occupy the placeholder in FileReaderManager
+    // 6. use special TsFileSequenceReader to occupy the placeholder in FileReaderManager
     try {
       FileReaderManager.getInstance()
           .occupyPlaceHolderWithCompactingTsFileReader(this.tsFileResource);
@@ -74,7 +76,7 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
               "cannot open file: %s, status: %s",
               tsFileResource.getTsFilePath(), tsFileResource.getStatus()));
     }
-    // 6. release write lock and acquire read lock
+    // 7. release write lock and acquire read lock
     writeUnLock();
   }
 

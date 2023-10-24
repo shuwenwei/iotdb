@@ -18,6 +18,7 @@
  */
 package org.apache.iotdb.db.storageengine.dataregion.tsfile;
 
+import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.DeviceTimeIndex;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.ITimeIndex;
@@ -27,10 +28,15 @@ import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.IntStream;
@@ -77,6 +83,134 @@ public class TsFileResourceTest {
     TsFileResource derTsFileResource = new TsFileResource(file);
     derTsFileResource.deserialize();
     Assert.assertEquals(tsFileResource, derTsFileResource);
+  }
+
+  @Test
+  public void testHardLinkWithNormalFile() throws IOException {
+    File tsFile =
+        new File(
+            TsFileNameGenerator.generateNewTsFilePath(TestConstant.BASE_OUTPUT_PATH, 1, 1, 1, 1));
+    writeBytesToFile(tsFile, 100);
+    TsFileResource tsFileResource = new TsFileResource(tsFile);
+    tsFileResource.setStatusForTest(TsFileResourceStatus.NORMAL);
+    File hardLinkFile = new File(tsFile.getAbsoluteFile() + ".link");
+    tsFileResource.hardLinkOrCopyTsFileTo(hardLinkFile.toPath());
+    Assert.assertEquals(100, hardLinkFile.length());
+
+    Files.deleteIfExists(tsFile.toPath());
+    Files.deleteIfExists(hardLinkFile.toPath());
+  }
+
+  @Test
+  public void testHardLinkUsingCopyFile() throws IOException {
+    File tsFile =
+        new File(
+            TsFileNameGenerator.generateNewTsFilePath(TestConstant.BASE_OUTPUT_PATH, 1, 1, 1, 1));
+    writeBytesToFile(tsFile, 100);
+    TsFileResource tsFileResource = new TsFileResource(tsFile);
+    tsFileResource.setStatusForTest(TsFileResourceStatus.COMPACTING);
+    File hardLinkFile = new File(tsFile.getAbsoluteFile() + ".link");
+    tsFileResource.hardLinkOrCopyTsFileTo(hardLinkFile.toPath());
+    Assert.assertEquals(100, hardLinkFile.length());
+
+    Files.deleteIfExists(tsFile.toPath());
+    Files.deleteIfExists(hardLinkFile.toPath());
+  }
+
+  @Test
+  @Ignore
+  /**
+   * This test is used to test transferring big file whose size is larger than 2GB. We ignored this
+   * test to avoid long time running
+   */
+  public void testHardLinkWith3GSplitFile() throws IOException {
+    File tsFile =
+        new File(
+            TsFileNameGenerator.generateNewTsFilePath(TestConstant.BASE_OUTPUT_PATH, 1, 1, 1, 1));
+    writeBytesToFile(tsFile, 1024L * 1024 * 1024 * 3 + 1024);
+    TsFileResource tsFileResource = new TsFileResource(tsFile);
+    tsFileResource.setStatusForTest(TsFileResourceStatus.SPLIT_DURING_COMPACTING);
+    tsFileResource.setDataSize(1024L * 1024 * 1024 * 3);
+
+    File metaFile =
+        new File(
+            TsFileNameGenerator.generateNewTsFilePath(TestConstant.BASE_OUTPUT_PATH, 1, 1, 1, 1)
+                + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX);
+    writeBytesToFile(metaFile, 100);
+
+    File hardLinkFile = new File(tsFile.getAbsoluteFile() + ".link");
+    tsFileResource.hardLinkOrCopyTsFileTo(hardLinkFile.toPath());
+    Assert.assertEquals(1024L * 1024 * 1024 * 3 + 100, hardLinkFile.length());
+    Files.deleteIfExists(tsFile.toPath());
+    Files.deleteIfExists(hardLinkFile.toPath());
+  }
+
+  @Test
+  public void testHardLinkWith3MSplitFile() throws IOException {
+    File tsFile =
+        new File(
+            TsFileNameGenerator.generateNewTsFilePath(TestConstant.BASE_OUTPUT_PATH, 1, 1, 1, 1));
+    writeBytesToFile(tsFile, 1024L * 1024 * 3 + 1024);
+    TsFileResource tsFileResource = new TsFileResource(tsFile);
+    tsFileResource.setStatusForTest(TsFileResourceStatus.SPLIT_DURING_COMPACTING);
+    tsFileResource.setDataSize(1024L * 1024 * 3);
+
+    File metaFile =
+        new File(
+            TsFileNameGenerator.generateNewTsFilePath(TestConstant.BASE_OUTPUT_PATH, 1, 1, 1, 1)
+                + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX);
+    writeBytesToFile(metaFile, 100);
+
+    File hardLinkFile = new File(tsFile.getAbsoluteFile() + ".link");
+    tsFileResource.hardLinkOrCopyTsFileTo(hardLinkFile.toPath());
+    Assert.assertEquals(1024L * 1024 * 3 + 100, hardLinkFile.length());
+    Files.deleteIfExists(tsFile.toPath());
+    Files.deleteIfExists(hardLinkFile.toPath());
+  }
+
+  @Test
+  public void testHardLinkWith3MSplitFileWithoutDirtyData() throws IOException {
+    File tsFile =
+        new File(
+            TsFileNameGenerator.generateNewTsFilePath(TestConstant.BASE_OUTPUT_PATH, 1, 1, 1, 1));
+    writeBytesToFile(tsFile, 1024L * 1024 * 3);
+    TsFileResource tsFileResource = new TsFileResource(tsFile);
+    tsFileResource.setStatusForTest(TsFileResourceStatus.SPLIT_DURING_COMPACTING);
+    tsFileResource.setDataSize(1024L * 1024 * 3);
+
+    File metaFile =
+        new File(
+            TsFileNameGenerator.generateNewTsFilePath(TestConstant.BASE_OUTPUT_PATH, 1, 1, 1, 1)
+                + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX);
+    writeBytesToFile(metaFile, 100);
+
+    File hardLinkFile = new File(tsFile.getAbsoluteFile() + ".link");
+    tsFileResource.hardLinkOrCopyTsFileTo(hardLinkFile.toPath());
+    Assert.assertEquals(1024L * 1024 * 3 + 100, hardLinkFile.length());
+    Files.deleteIfExists(tsFile.toPath());
+    Files.deleteIfExists(hardLinkFile.toPath());
+  }
+
+  private void writeBytesToFile(File file, long bytesLength) throws IOException {
+    try (FileOutputStream fos = new FileOutputStream(file);
+        FileChannel fileChannel = fos.getChannel()) {
+      int bufferSize = 1024 * 1024;
+      long leftSize = bytesLength;
+      while (leftSize > 0) {
+        byte[] data;
+        if (leftSize > bufferSize) {
+          data = new byte[bufferSize];
+        } else {
+          data = new byte[(int) leftSize];
+        }
+        for (int i = 0; i < data.length; i++) {
+          data[i] = (byte) (i + 1);
+        }
+        ByteBuffer buffer = ByteBuffer.wrap(data);
+        fileChannel.write(buffer);
+        leftSize -= data.length;
+      }
+    }
   }
 
   @Test

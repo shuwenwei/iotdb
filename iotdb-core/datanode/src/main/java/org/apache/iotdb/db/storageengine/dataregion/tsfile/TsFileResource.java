@@ -18,6 +18,7 @@
  */
 package org.apache.iotdb.db.storageengine.dataregion.tsfile;
 
+import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.commons.consensus.index.ProgressIndex;
 import org.apache.iotdb.commons.consensus.index.ProgressIndexType;
 import org.apache.iotdb.commons.consensus.index.impl.MinimumProgressIndex;
@@ -38,7 +39,6 @@ import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.ITimeIndex;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.TimeIndexLevel;
 import org.apache.iotdb.db.storageengine.rescon.disk.TierManager;
 import org.apache.iotdb.db.utils.DateTimeUtils;
-import org.apache.iotdb.tsfile.common.constant.TsFileConstant;
 import org.apache.iotdb.tsfile.file.metadata.IChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.ITimeSeriesMetadata;
 import org.apache.iotdb.tsfile.fileSystem.FSFactoryProducer;
@@ -57,9 +57,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.FileAlreadyExistsException;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -156,6 +157,8 @@ public class TsFileResource {
   private ProgressIndex maxProgressIndex;
 
   private double effectiveInfoRatio = 1;
+  private long dataSize;
+  private boolean hasHardLink = false;
 
   public TsFileResource() {}
 
@@ -659,7 +662,8 @@ public class TsFileResource {
             || compareAndSetStatus(
                 TsFileResourceStatus.SPLIT_DURING_COMPACTING, TsFileResourceStatus.NORMAL)
             || compareAndSetStatus(
-                TsFileResourceStatus.COMPACTION_CANDIDATE, TsFileResourceStatus.NORMAL);
+                TsFileResourceStatus.COMPACTION_CANDIDATE, TsFileResourceStatus.NORMAL)
+            || compareAndSetStatus(TsFileResourceStatus.HARD_LINKING, TsFileResourceStatus.NORMAL);
       case UNCLOSED:
         // TsFile cannot be set back to UNCLOSED so false is always returned
         return false;
@@ -675,6 +679,10 @@ public class TsFileResource {
       case SPLIT_DURING_COMPACTING:
         return compareAndSetStatus(
             TsFileResourceStatus.COMPACTING, TsFileResourceStatus.SPLIT_DURING_COMPACTING);
+      case HARD_LINKING:
+        return compareAndSetStatus(TsFileResourceStatus.NORMAL, TsFileResourceStatus.HARD_LINKING)
+            || compareAndSetStatus(
+                TsFileResourceStatus.COMPACTION_CANDIDATE, TsFileResourceStatus.HARD_LINKING);
       case COMPACTION_CANDIDATE:
         return compareAndSetStatus(
             TsFileResourceStatus.NORMAL, TsFileResourceStatus.COMPACTION_CANDIDATE);
@@ -838,48 +846,6 @@ public class TsFileResource {
   /** Check whether the tsFile spans multiple time partitions. */
   public boolean isSpanMultiTimePartitions() {
     return timeIndex.isSpanMultiTimePartitions();
-  }
-
-  /**
-   * Create a hardlink for the TsFile and modification file (if exists) The hardlink will have a
-   * suffix like ".{sysTime}_{randomLong}"
-   *
-   * @return a new TsFileResource with its file changed to the hardlink or null the hardlink cannot
-   *     be created.
-   */
-  public TsFileResource createHardlink() {
-    if (!file.exists()) {
-      return null;
-    }
-
-    TsFileResource newResource;
-    try {
-      newResource = new TsFileResource(this);
-    } catch (IOException e) {
-      LOGGER.error("Cannot create hardlink for {}", file, e);
-      return null;
-    }
-
-    while (true) {
-      String hardlinkSuffix =
-          TsFileConstant.PATH_SEPARATOR + System.currentTimeMillis() + "_" + random.nextLong();
-      File hardlink = new File(file.getAbsolutePath() + hardlinkSuffix);
-
-      try {
-        Files.createLink(Paths.get(hardlink.getAbsolutePath()), Paths.get(file.getAbsolutePath()));
-        newResource.setFile(hardlink);
-        if (modFile != null && modFile.exists()) {
-          newResource.setModFile(modFile.createHardlink());
-        }
-        break;
-      } catch (FileAlreadyExistsException e) {
-        // retry a different name if the file is already created
-      } catch (IOException e) {
-        LOGGER.error("Cannot create hardlink for {}", file, e);
-        return null;
-      }
-    }
-    return newResource;
   }
 
   public void setModFile(ModificationFile modFile) {
@@ -1177,5 +1143,87 @@ public class TsFileResource {
 
   public void setEffectiveInfoRatio(double ratio) {
     this.effectiveInfoRatio = ratio;
+  }
+
+  public void hardLinkOrCopyTsFileTo(Path targetPath) throws IOException {
+    if (setStatus(TsFileResourceStatus.HARD_LINKING)) {
+      try {
+        // use hard link directly
+        Files.createLink(targetPath, getTsFile().toPath());
+        this.hasHardLink = true;
+      } finally {
+        // no matter what previous status is, we transit it status back to NORMAL directly.
+        // For example, its previous is COMPACTION_CANDIDATE, if its status is transit back to
+        // NORMAL, the compaction task will be terminated before executing, which has no side effect
+        // to the whole process
+        setStatus(TsFileResourceStatus.NORMAL);
+      }
+    } else {
+      // copy this file to target path
+      readLock();
+      try {
+        if (this.getStatus() == TsFileResourceStatus.SPLIT_DURING_COMPACTING) {
+          // combine the data part and meta part into target file
+          copyWhenMetaIsSplit(targetPath);
+        } else {
+          Files.copy(getTsFile().toPath(), targetPath);
+        }
+      } finally {
+        readUnlock();
+      }
+    }
+  }
+
+  private void copyWhenMetaIsSplit(Path path) throws IOException {
+    Path tsfilePath = getTsFile().toPath();
+    Path metaPath =
+        new File(getTsFilePath() + IoTDBConstant.IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX)
+            .toPath();
+
+    try (FileChannel tsFile = FileChannel.open(tsfilePath, StandardOpenOption.READ);
+        FileChannel meta = FileChannel.open(metaPath, StandardOpenOption.READ);
+        FileChannel targetFileChannel =
+            FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+
+      long dataSize = getDataSize();
+      long transferredBytes = 0;
+      while (transferredBytes < dataSize) {
+        long count =
+            tsFile.transferTo(transferredBytes, dataSize - transferredBytes, targetFileChannel);
+        transferredBytes += count;
+        if (count == 0 && transferredBytes < dataSize) {
+          throw new IOException(
+              String.format(
+                  "error when transferring data into target file. target: %s, source: %s, expected: %d, actual: %d",
+                  path, tsfilePath, dataSize, transferredBytes));
+        }
+      }
+
+      long metaSize = meta.size();
+      transferredBytes = 0;
+      while (transferredBytes < metaSize) {
+        long count =
+            meta.transferTo(transferredBytes, metaSize - transferredBytes, targetFileChannel);
+        transferredBytes += count;
+        if (count == 0 && transferredBytes < dataSize) {
+          throw new IOException(
+              String.format(
+                  "error when transferring meta into target file. target: %s, meta: %s, expected: %d, actual: %d",
+                  path, metaPath, metaSize, transferredBytes));
+        }
+      }
+    }
+  }
+
+  public void setDataSize(long dataSize) {
+    this.dataSize = dataSize;
+  }
+
+  public long getDataSize() {
+    return dataSize;
+  }
+
+  public boolean isHasHardLink() {
+    return hasHardLink;
   }
 }
