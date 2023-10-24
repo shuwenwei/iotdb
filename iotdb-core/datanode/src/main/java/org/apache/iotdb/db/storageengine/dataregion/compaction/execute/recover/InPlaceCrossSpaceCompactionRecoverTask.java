@@ -123,11 +123,11 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     int sourceSeqFileNum = 0;
     for (TsFileIdentifier sourceFileIdentifier : sourceFileIdentifiers) {
       sourceSeqFileNum += sourceFileIdentifier.isSequence() ? 1 : 0;
-      File sourceFile = sourceFileIdentifier.getFileFromDataDirs();
+      File sourceFile = sourceFileIdentifier.getFileFromDataDirsIfAnyAdjuvantFileExists();
       if (sourceFile == null) {
         continue;
       }
-      if (!sourceFileIdentifier.getFileFromDataDirs().exists()) {
+      if (!sourceFile.exists()) {
         continue;
       }
       if (sourceFileIdentifier.isSequence()) {
@@ -159,7 +159,7 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     if (allSourceFileExists) {
       handleWithAllSourceFileExists(existSeqFiles, existUnSeqFiles, targetFileIdentifiers);
     } else {
-      handleWithSomeSourceFileLost(existSeqFiles, existUnSeqFiles);
+      handleWithSomeSourceFileLost(existSeqFiles, existUnSeqFiles, sourceFileIdentifiers);
     }
   }
 
@@ -217,20 +217,20 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
   }
 
   private void handleWithSomeSourceFileLost(
-      List<TsFileIdentifier> existSeqFiles, List<TsFileIdentifier> existUnSeqFiles) {
+      List<TsFileIdentifier> existSeqFiles, List<TsFileIdentifier> existUnSeqFiles, List<TsFileIdentifier> sourceIdentifiers) {
     // 1. remove all source files
     // 2. rename seq files to target file
     try {
 
-      for (TsFileIdentifier identifier : existUnSeqFiles) {
-        deleteResourceAndModsFile(identifier);
-      }
       for (TsFileIdentifier identifier : existSeqFiles) {
         TsFileResource resource = getTsFileResource(identifier);
         File targetFile = TsFileNameGenerator.getCrossSpaceCompactionTargetFile(resource, false);
         Files.move(resource.getTsFile().toPath(), targetFile.toPath());
 
         deleteResourceAndModsFile(resource);
+      }
+      for (TsFileIdentifier identifier : sourceIdentifiers) {
+        deleteResourceAndModsFile(identifier);
       }
     } catch (IOException e) {
       throw new CompactionRecoverException("Can not recover compaction files", e);
@@ -253,7 +253,7 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
   }
 
   private TsFileResource getTsFileResource(TsFileIdentifier identifier) {
-    File f = identifier.getFileFromDataDirs();
+    File f = identifier.getFileFromDataDirsIfAnyAdjuvantFileExists();
     if (f == null) {
       return null;
     }
