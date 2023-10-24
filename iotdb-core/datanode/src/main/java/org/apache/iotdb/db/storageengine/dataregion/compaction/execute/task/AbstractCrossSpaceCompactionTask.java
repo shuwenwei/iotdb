@@ -41,13 +41,15 @@ public abstract class AbstractCrossSpaceCompactionTask extends AbstractCompactio
       List<TsFileResource> selectedUnsequenceFiles,
       ICrossCompactionPerformer performer,
       long memoryCost,
-      long serialId) {
+      long serialId,
+      CompactionTaskType compactionTaskType) {
     super(
         tsFileManager.getStorageGroupName(),
         tsFileManager.getDataRegionId(),
         timePartition,
         tsFileManager,
-        serialId);
+        serialId,
+        compactionTaskType);
     this.selectedSequenceFiles = selectedSequenceFiles;
     this.selectedUnsequenceFiles = selectedUnsequenceFiles;
     for (TsFileResource resource : selectedSequenceFiles) {
@@ -62,6 +64,25 @@ public abstract class AbstractCrossSpaceCompactionTask extends AbstractCompactio
     this.crossTask = true;
     this.innerSeqTask = false;
     createSummary();
+  }
+
+  protected AbstractCrossSpaceCompactionTask(
+      long timePartition,
+      TsFileManager tsFileManager,
+      List<TsFileResource> selectedSequenceFiles,
+      List<TsFileResource> selectedUnsequenceFiles,
+      ICrossCompactionPerformer performer,
+      long memoryCost,
+      long serialId) {
+    this(
+        timePartition,
+        tsFileManager,
+        selectedSequenceFiles,
+        selectedUnsequenceFiles,
+        performer,
+        memoryCost,
+        serialId,
+        CompactionTaskType.NORMAL);
   }
 
   protected AbstractCrossSpaceCompactionTask(

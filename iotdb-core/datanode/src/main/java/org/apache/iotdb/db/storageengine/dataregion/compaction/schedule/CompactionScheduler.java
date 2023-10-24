@@ -23,6 +23,8 @@ import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.db.conf.IoTDBConfig;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCrossSpaceCompactionTask;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InnerSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.ICompactionSelector;
@@ -34,7 +36,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * CompactionScheduler schedules and submits the compaction task periodically, and it counts the
@@ -132,27 +133,38 @@ public class CompactionScheduler {
         crossSpaceCompactionSelector.selectCrossSpaceTask(
             tsFileManager.getOrCreateSequenceListByTimePartition(timePartition),
             tsFileManager.getOrCreateUnsequenceListByTimePartition(timePartition));
-    List<Long> memoryCost =
-        taskList.stream()
-            .map(CrossCompactionTaskResource::getTotalMemoryCost)
-            .collect(Collectors.toList());
     // the name of this variable is trySubmitCount, because the task submitted to the queue could be
     // evicted due to the low priority of the task
     int trySubmitCount = 0;
-    for (int i = 0, size = taskList.size(); i < size; ++i) {
-      if (CompactionTaskManager.getInstance()
-          .addTaskToWaitingQueue(
-              new InPlaceCrossSpaceCompactionTask(
-                  timePartition,
-                  tsFileManager,
-                  taskList.get(i).getSeqFiles(),
-                  taskList.get(i).getUnseqFiles(),
-                  new InPlaceFastCompactionPerformer(),
-                  memoryCost.get(i),
-                  tsFileManager.getNextCompactionTaskId()))) {
+    for (CrossCompactionTaskResource taskResource : taskList) {
+      AbstractCrossSpaceCompactionTask task;
+      if (taskResource.isContainsLevelZeroFiles() || taskResource.getOverlapRatio() > 0.3) {
+        task =
+            new CrossSpaceCompactionTask(
+                timePartition,
+                tsFileManager,
+                taskResource.getSeqFiles(),
+                taskResource.getUnseqFiles(),
+                new InPlaceFastCompactionPerformer(),
+                taskResource.getTotalMemoryCost(),
+                tsFileManager.getNextCompactionTaskId());
+      } else {
+        task =
+            new InPlaceCrossSpaceCompactionTask(
+                timePartition,
+                tsFileManager,
+                taskResource.getSeqFiles(),
+                taskResource.getUnseqFiles(),
+                new InPlaceFastCompactionPerformer(),
+                taskResource.getTotalMemoryCost(),
+                tsFileManager.getNextCompactionTaskId());
+      }
+
+      if (CompactionTaskManager.getInstance().addTaskToWaitingQueue(task)) {
         trySubmitCount++;
       }
     }
+
     return trySubmitCount;
   }
 }
