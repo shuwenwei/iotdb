@@ -193,8 +193,6 @@ public class CompactionUtils {
         seqModifications.add(seqCompactionModification);
       }
       seqModifications.addAll(modifications);
-      Set<String> rewriteDevices =
-          rewriteDeviceOfSeqFiles.getOrDefault(seqFile, Collections.emptySet());
 
       String targetModificationFilePath =
           TsFileNameGenerator.getCrossSpaceCompactionTargetFile(seqFile, false).getAbsolutePath()
@@ -203,18 +201,9 @@ public class CompactionUtils {
         for (Modification modification : seqModifications) {
           modificationFile.write(modification);
         }
-        for (String device : rewriteDevices) {
-          Deletion modification =
-              new Deletion(
-                  new PartialPath(device),
-                  dataSizeOfSeqFilesBeforeCompaction.get(i),
-                  Long.MIN_VALUE,
-                  Long.MAX_VALUE);
-          modificationFile.write(modification);
-        }
       }
 
-      if (!seqModifications.isEmpty() || !rewriteDevices.isEmpty()) {
+      if (!seqModifications.isEmpty()) {
         FileMetrics.getInstance().increaseModFileNum(1);
         FileMetrics.getInstance().increaseModFileSize(seqFile.getModFile().getSize());
       }

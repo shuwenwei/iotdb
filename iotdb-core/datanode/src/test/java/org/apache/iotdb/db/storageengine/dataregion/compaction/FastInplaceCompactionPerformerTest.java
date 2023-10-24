@@ -25,6 +25,7 @@ import org.apache.iotdb.commons.exception.MetadataException;
 import org.apache.iotdb.commons.path.PartialPath;
 import org.apache.iotdb.db.exception.StorageEngineException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.recover.CompactionRecoverManager;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.validator.CompactionValidator;
@@ -122,7 +123,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
         tsFileManager.getTsFileList(true));
     File targetFile = tsFileManager.getTsFileList(true).get(0).getTsFile();
     ModificationFile modsFile = tsFileManager.getTsFileList(true).get(0).getModFile();
-    Assert.assertTrue(modsFile.exists());
+    Assert.assertFalse(modsFile.exists());
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 10, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
@@ -172,7 +173,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
         tsFileManager.getTsFileList(true));
     File targetFile = tsFileManager.getTsFileList(true).get(0).getTsFile();
     ModificationFile modsFile = tsFileManager.getTsFileList(true).get(0).getModFile();
-    Assert.assertTrue(modsFile.exists());
+    Assert.assertFalse(modsFile.exists());
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 10, 24);
     try (TsFileSequenceReader reader = new TsFileSequenceReader(targetFile.getAbsolutePath())) {
@@ -1165,7 +1166,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
         tsFileManager.getTsFileList(true));
     TsFileResource targetFileResource = tsFileManager.getTsFileList(true).get(0);
     File targetFile = targetFileResource.getTsFile();
-    Assert.assertTrue(
+    Assert.assertFalse(
         new File(targetFile.getAbsolutePath() + ModificationFile.FILE_SUFFIX).exists());
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 10, 24);
@@ -1215,7 +1216,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
         tsFileManager.getTsFileList(true));
     TsFileResource targetFileResource = tsFileManager.getTsFileList(true).get(0);
     File targetFile = targetFileResource.getTsFile();
-    Assert.assertTrue(
+    Assert.assertFalse(
         new File(targetFile.getAbsolutePath() + ModificationFile.FILE_SUFFIX).exists());
     assertDeviceTimeRangeInResource(
         tsFileManager.getTsFileList(true).get(0), "root.testsg.d1", 10, 24);
@@ -1363,8 +1364,8 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
         tsFileManager.getTsFileList(true));
     List<TsFileResource> targetFiles = tsFileManager.getTsFileList(true);
     Assert.assertFalse(targetFiles.get(0).getModFile().exists());
-    Assert.assertTrue(targetFiles.get(1).getModFile().exists());
-    Assert.assertTrue(targetFiles.get(2).getModFile().exists());
+    Assert.assertFalse(targetFiles.get(1).getModFile().exists());
+    Assert.assertFalse(targetFiles.get(2).getModFile().exists());
     assertDeviceTimeRangeInResource(targetFiles.get(0), "root.testsg.d1", 10, 20);
     assertDeviceTimeRangeInResource(targetFiles.get(1), "root.testsg.d1", 21, 50);
     assertDeviceTimeRangeInResource(targetFiles.get(2), "root.testsg.d1", 51, 100);
@@ -1467,9 +1468,9 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
         t.getSelectedUnsequenceFiles(),
         tsFileManager.getTsFileList(true));
     List<TsFileResource> targetFiles = tsFileManager.getTsFileList(true);
-    Assert.assertTrue(targetFiles.get(0).getModFile().exists());
-    Assert.assertTrue(targetFiles.get(0).getModFile().exists());
-    Assert.assertTrue(targetFiles.get(0).getModFile().exists());
+    Assert.assertFalse(targetFiles.get(0).getModFile().exists());
+    Assert.assertFalse(targetFiles.get(0).getModFile().exists());
+    Assert.assertFalse(targetFiles.get(0).getModFile().exists());
     assertDeviceTimeRangeInResource(targetFiles.get(0), "root.testsg.d1", 10, 30);
     assertDeviceTimeRangeInResource(targetFiles.get(1), "root.testsg.d1", 40, 70);
     assertDeviceTimeRangeInResource(targetFiles.get(2), "root.testsg.d1", 83, 100);
