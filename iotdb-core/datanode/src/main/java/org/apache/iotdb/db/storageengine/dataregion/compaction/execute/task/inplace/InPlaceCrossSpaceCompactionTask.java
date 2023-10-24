@@ -126,7 +126,6 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
             inPlaceCompactionSeqFiles.get(0).tsFileResource.getTsFile().getAbsolutePath()
                 + CompactionLogger.IN_PLACE_CROSS_COMPACTION_LOG_NAME_SUFFIX);
     try (CompactionLogger logger = new CompactionLogger(logFile)) {
-
       initSeqFileInfo();
       recordLogBeforeDoingCompaction(logger);
 
@@ -251,6 +250,8 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
       for (InPlaceCompactionFile f : this.inPlaceCompactionUnSeqFiles) {
         logger.logFile(f.getTsFileResource(), CompactionLogger.STR_SOURCE_FILES);
       }
+      logger.logFiles(TsFileNameGenerator.getCrossCompactionTargetFileResources(selectedSequenceFiles, false), CompactionLogger.STR_TARGET_FILES);
+      logger.force();
     } catch (IOException e) {
       throw new InPlaceCompactionErrorException("error when recording log before compaction", e);
     }

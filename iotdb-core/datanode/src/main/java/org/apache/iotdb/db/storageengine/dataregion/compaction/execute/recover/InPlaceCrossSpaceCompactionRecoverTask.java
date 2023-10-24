@@ -123,7 +123,11 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     int sourceSeqFileNum = 0;
     for (TsFileIdentifier sourceFileIdentifier : sourceFileIdentifiers) {
       sourceSeqFileNum += sourceFileIdentifier.isSequence() ? 1 : 0;
-      if (!new File(sourceFileIdentifier.getFilePath()).exists()) {
+      File sourceFile = sourceFileIdentifier.getFileFromDataDirs();
+      if (sourceFile == null) {
+        continue;
+      }
+      if (!sourceFileIdentifier.getFileFromDataDirs().exists()) {
         continue;
       }
       if (sourceFileIdentifier.isSequence()) {
@@ -135,7 +139,8 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
 
     int existTargetFileNum = 0;
     for (TsFileIdentifier targetFileIdentifier : targetFileIdentifiers) {
-      if (new File(targetFileIdentifier.getFilePath()).exists()) {
+      File targetFile = targetFileIdentifier.getFileFromDataDirs();
+      if (targetFile != null && targetFile.exists()) {
         existTargetFileNum++;
       }
     }
@@ -234,6 +239,9 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
 
   private void deleteResourceAndModsFile(TsFileIdentifier identifier) throws IOException {
     TsFileResource resource = getTsFileResource(identifier);
+    if (resource == null) {
+      return;
+    }
     deleteResourceAndModsFile(resource);
   }
 
@@ -245,7 +253,10 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
   }
 
   private TsFileResource getTsFileResource(TsFileIdentifier identifier) {
-    File f = new File(identifier.getFilePath());
+    File f = identifier.getFileFromDataDirs();
+    if (f == null) {
+      return null;
+    }
     TsFileResource resource = new TsFileResource();
     resource.setFile(f);
     return resource;

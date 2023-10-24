@@ -190,12 +190,17 @@ public class TsFileNameGenerator {
    */
   public static List<TsFileResource> getCrossCompactionTargetFileResources(
       List<TsFileResource> seqResources) throws IOException {
+    return getCrossCompactionTargetFileResources(seqResources, true);
+  }
+
+  public static List<TsFileResource> getCrossCompactionTargetFileResources(
+      List<TsFileResource> seqResources, boolean isTempFile) throws IOException {
     List<TsFileResource> targetFileResources = new ArrayList<>();
     for (TsFileResource resource : seqResources) {
       // set target resource to COMPACTING until the end of this task
       targetFileResources.add(
           new TsFileResource(
-              getCrossSpaceCompactionTargetFile(resource, true), TsFileResourceStatus.COMPACTING));
+              getCrossSpaceCompactionTargetFile(resource, isTempFile), TsFileResourceStatus.COMPACTING));
     }
     return targetFileResources;
   }
