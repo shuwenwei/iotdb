@@ -86,6 +86,7 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
       FileChannel src = getTsFileChannel();
       FileChannel dst = getMetaFileChannel();
       long transferSize = src.transferTo(dataSize, metadataSize, dst);
+      tranferTo(src, dst, dataSize, metadataSize);
       if (transferSize != metadataSize) {
         throw new InPlaceCompactionErrorException(
             String.format(
@@ -125,10 +126,7 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
         FileChannel metaFileChannel = getMetaFileChannel();
         tsFileChannel.truncate(dataSize);
         tsFileChannel.position(dataSize);
-        long transferSize = metaFileChannel.transferTo(0, metadataSize, tsFileChannel);
-        if (transferSize != metadataSize) {
-          throw new RuntimeException("Failed to recover TsFile");
-        }
+        tranferTo(metaFileChannel, tsFileChannel, 0, metadataSize);
         tsFileChannel.force(true);
         updateTsFileResourceStatusToCompacting();
       }
@@ -139,6 +137,22 @@ public class InPlaceCompactionSeqFile extends InPlaceCompactionFile {
       throw new InPlaceCompactionErrorException("error when recover source file", e);
     } finally {
       writeUnLock();
+    }
+  }
+
+  private void tranferTo(FileChannel src, FileChannel dst, long srcPosition, long sizeToTransfer)
+      throws IOException {
+    long transferredBytes = 0;
+    while (transferredBytes < sizeToTransfer) {
+      long count =
+          src.transferTo(srcPosition + transferredBytes, sizeToTransfer - transferredBytes, dst);
+      transferredBytes += count;
+      if (count == 0 && transferredBytes < sizeToTransfer) {
+        throw new IOException(
+            String.format(
+                "Cannot transfer more size from src channel to dst channel. expected: %d, actual: %d",
+                sizeToTransfer, transferredBytes));
+      }
     }
   }
 

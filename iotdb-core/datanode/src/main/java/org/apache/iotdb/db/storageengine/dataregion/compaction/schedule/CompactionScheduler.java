@@ -22,6 +22,7 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.schedule;
 import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.db.conf.IoTDBConfig;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.FastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CrossSpaceCompactionTask;
@@ -138,14 +139,16 @@ public class CompactionScheduler {
     int trySubmitCount = 0;
     for (CrossCompactionTaskResource taskResource : taskList) {
       AbstractCrossSpaceCompactionTask task;
-      if (taskResource.isContainsLevelZeroFiles() || taskResource.getOverlapRatio() > 0.3) {
+      if (taskResource.containsHardLinkSourceFile()
+          || taskResource.isContainsLevelZeroFiles()
+          || taskResource.getOverlapRatio() > 0.3) {
         task =
             new CrossSpaceCompactionTask(
                 timePartition,
                 tsFileManager,
                 taskResource.getSeqFiles(),
                 taskResource.getUnseqFiles(),
-                new InPlaceFastCompactionPerformer(),
+                new FastCompactionPerformer(true),
                 taskResource.getTotalMemoryCost(),
                 tsFileManager.getNextCompactionTaskId());
       } else {

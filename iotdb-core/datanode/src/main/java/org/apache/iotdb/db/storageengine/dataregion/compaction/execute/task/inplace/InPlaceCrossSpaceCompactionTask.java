@@ -50,6 +50,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @SuppressWarnings({"squid:S1206", "squid:S2160"})
 public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
@@ -103,6 +104,10 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
   @Override
   @SuppressWarnings({"squid:S6541", "squid:S3776", "squid:S2142"})
   public boolean doCompaction() {
+    if (Stream.concat(selectedSequenceFiles.stream(), selectedUnsequenceFiles.stream())
+        .anyMatch(TsFileResource::isHasHardLink)) {
+      return false;
+    }
     long startTime = System.currentTimeMillis();
 
     LOGGER.info(

@@ -43,6 +43,7 @@ public class CrossCompactionTaskResource {
   private float totalUnseqFileSize;
   private long totalFileNums;
 
+  private boolean hasHardLinkSourceFile;
   private boolean isContainsLevelZeroFiles;
 
   private double overlapRatio;
@@ -86,6 +87,7 @@ public class CrossCompactionTaskResource {
   }
 
   private void addUnseqFile(TsFileResource file) {
+    hasHardLinkSourceFile |= file.isHasHardLink();
     unseqFiles.add(file);
     totalUnseqFileSize += file.getTsFileSize();
     countStatistic(file);
@@ -96,6 +98,7 @@ public class CrossCompactionTaskResource {
   }
 
   private void addSeqFile(TsFileResource file) {
+    hasHardLinkSourceFile |= file.isHasHardLink();
     seqFiles.add(file);
     totalSeqFileSize += file.getTsFileSize();
     countStatistic(file);
@@ -160,6 +163,10 @@ public class CrossCompactionTaskResource {
 
   public boolean isContainsLevelZeroFiles() {
     return isContainsLevelZeroFiles;
+  }
+
+  public boolean containsHardLinkSourceFile() {
+    return hasHardLinkSourceFile;
   }
 
   public double getOverlapRatio() {
