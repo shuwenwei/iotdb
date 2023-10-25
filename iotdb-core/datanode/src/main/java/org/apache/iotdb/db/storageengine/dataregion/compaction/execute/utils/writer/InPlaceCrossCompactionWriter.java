@@ -32,6 +32,7 @@ import java.util.Map;
 public class InPlaceCrossCompactionWriter extends FastCrossCompactionWriter {
 
   boolean[] deviceExistButNotRewrite;
+  boolean[] hasNotRewrittenDevice;
 
   public InPlaceCrossCompactionWriter(
       List<TsFileResource> targetResources,
@@ -40,6 +41,7 @@ public class InPlaceCrossCompactionWriter extends FastCrossCompactionWriter {
       throws IOException {
     super(targetResources, seqSourceResources, readerMap, true);
     this.deviceExistButNotRewrite = new boolean[targetResources.size()];
+    this.hasNotRewrittenDevice = new boolean[targetResources.size()];
   }
 
   public void writeChunkMetadataList(TsFileResource resource, List<ChunkMetadata> chunkMetadataList)
@@ -50,6 +52,7 @@ public class InPlaceCrossCompactionWriter extends FastCrossCompactionWriter {
         for (ChunkMetadata chunkMetadata : chunkMetadataList) {
           targetFileWriter.directlyWriteChunkMetadata(chunkMetadata);
           deviceExistButNotRewrite[i] = true;
+          hasNotRewrittenDevice[i] = true;
         }
         return;
       }
@@ -73,7 +76,7 @@ public class InPlaceCrossCompactionWriter extends FastCrossCompactionWriter {
     for (int i = 0; i < isEmptyFile.length; i++) {
       targetFileWriters.get(i).endFile();
       // set empty target file to DELETED
-      if (isEmptyFile[i] && deviceExistButNotRewrite[i]) {
+      if (isEmptyFile[i] && !hasNotRewrittenDevice[i]) {
         targetResources.get(i).forceMarkDeleted();
       }
     }
