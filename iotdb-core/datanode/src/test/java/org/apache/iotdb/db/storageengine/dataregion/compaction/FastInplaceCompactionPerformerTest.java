@@ -293,6 +293,59 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
   }
 
   @Test
+  public void testCompactionTargetFileIsEmpty() throws IOException, IllegalPathException {
+    List<TsFileResource> seqFiles = new ArrayList<>();
+    List<TsFileResource> unseqFiles = new ArrayList<>();
+    TsFileResource seqResource1 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(10, 20)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            true);
+    seqResource1
+        .getModFile()
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"),
+                Long.MAX_VALUE,
+                Long.MIN_VALUE,
+                Long.MAX_VALUE));
+    seqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+    TsFileResource unseqResource1 =
+        generateSingleNonAlignedSeriesFile(
+            "d1",
+            "s1",
+            new TimeRange[] {new TimeRange(21, 24)},
+            TSEncoding.PLAIN,
+            CompressionType.LZ4,
+            false);
+    unseqResource1
+        .getModFile()
+        .write(
+            new Deletion(
+                new PartialPath("root.testsg.d1", "s1"),
+                Long.MAX_VALUE,
+                Long.MIN_VALUE,
+                Long.MAX_VALUE));
+    unseqResource1.setStatusForTest(TsFileResourceStatus.COMPACTION_CANDIDATE);
+
+    seqFiles.add(seqResource1);
+    unseqFiles.add(unseqResource1);
+    tsFileManager.addAll(seqFiles, true);
+    tsFileManager.addAll(unseqFiles, false);
+
+    CompactionTaskManager.getInstance().start();
+    InPlaceCrossSpaceCompactionTask t =
+        new InPlaceCrossSpaceCompactionTask(
+            0, tsFileManager, seqFiles, unseqFiles, new InPlaceFastCompactionPerformer(), 100, 0);
+
+    Assert.assertTrue(worker.processOneCompactionTask(t));
+    Assert.assertTrue(tsFileManager.getTsFileList(true).isEmpty());
+  }
+
+  @Test
   public void testOneSourceSeqFileOverlappedNonAlignedDeviceHasFullDeletion1()
       throws IOException, IllegalPathException {
     List<TsFileResource> seqFiles = new ArrayList<>();

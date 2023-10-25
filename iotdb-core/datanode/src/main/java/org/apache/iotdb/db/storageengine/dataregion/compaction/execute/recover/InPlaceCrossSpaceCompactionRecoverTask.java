@@ -84,6 +84,7 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
 
     List<TsFileIdentifier> sourceFileIdentifiers = logAnalyzer.getSourceFileInfos();
     List<TsFileIdentifier> targetFileIdentifiers = logAnalyzer.getTargetFileInfos();
+    List<TsFileIdentifier> deletedTargetFileIdentifiers = logAnalyzer.getDeletedTargetFileInfos();
 
     // compaction log file is incomplete
     if (targetFileIdentifiers.isEmpty() || sourceFileIdentifiers.isEmpty()) {
@@ -93,7 +94,8 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     }
 
     try {
-      recoverCompactionFiles(sourceFileIdentifiers, targetFileIdentifiers);
+      recoverCompactionFiles(
+          sourceFileIdentifiers, targetFileIdentifiers, deletedTargetFileIdentifiers);
     } catch (CompactionRecoverException e) {
       logger.error(
           "{} [Compaction][Recover] failed to recover compaction log file {}, abort recover",
@@ -116,7 +118,9 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
   }
 
   private void recoverCompactionFiles(
-      List<TsFileIdentifier> sourceFileIdentifiers, List<TsFileIdentifier> targetFileIdentifiers) {
+      List<TsFileIdentifier> sourceFileIdentifiers,
+      List<TsFileIdentifier> targetFileIdentifiers,
+      List<TsFileIdentifier> deletedTargetFileIdentifiers) {
     List<TsFileIdentifier> existSeqFiles = new ArrayList<>();
     List<TsFileIdentifier> existUnSeqFiles = new ArrayList<>();
 
@@ -147,7 +151,9 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
 
     boolean allSourceFileExists =
         existSeqFiles.size() + existUnSeqFiles.size() == sourceFileIdentifiers.size();
-    boolean canRecover = existSeqFiles.size() + existTargetFileNum == sourceSeqFileNum;
+    boolean canRecover =
+        existSeqFiles.size() + existTargetFileNum + deletedTargetFileIdentifiers.size()
+            >= sourceSeqFileNum;
     if (!canRecover) {
       logger.error(
           "{} [Compaction][Recover] Can not recover log file {} because some file is lost",
@@ -159,7 +165,8 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
     if (allSourceFileExists) {
       handleWithAllSourceFileExists(existSeqFiles, existUnSeqFiles, targetFileIdentifiers);
     } else {
-      handleWithSomeSourceFileLost(existSeqFiles, existUnSeqFiles, sourceFileIdentifiers);
+      handleWithSomeSourceFileLost(
+          existSeqFiles, existUnSeqFiles, sourceFileIdentifiers, deletedTargetFileIdentifiers);
     }
   }
 
@@ -219,7 +226,8 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
   private void handleWithSomeSourceFileLost(
       List<TsFileIdentifier> existSeqFiles,
       List<TsFileIdentifier> existUnSeqFiles,
-      List<TsFileIdentifier> sourceIdentifiers) {
+      List<TsFileIdentifier> sourceIdentifiers,
+      List<TsFileIdentifier> deletedIdentifiers) {
     // 1. remove all source files
     // 2. rename seq files to target file
     try {
@@ -238,6 +246,9 @@ public class InPlaceCrossSpaceCompactionRecoverTask {
             deleteMetadataFileIfExists(resource);
           }
         }
+        deleteResourceAndModsFile(identifier);
+      }
+      for (TsFileIdentifier identifier : deletedIdentifiers) {
         deleteResourceAndModsFile(identifier);
       }
     } catch (IOException e) {

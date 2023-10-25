@@ -32,6 +32,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.Comp
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.InPlaceFastCompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.CompactionLogger;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.SimpleCompactionLogger;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.validator.CompactionValidator;
 import org.apache.iotdb.db.storageengine.dataregion.read.control.FileReaderManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
@@ -130,7 +131,7 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
         new File(
             inPlaceCompactionSeqFiles.get(0).tsFileResource.getTsFile().getAbsolutePath()
                 + CompactionLogger.IN_PLACE_CROSS_COMPACTION_LOG_NAME_SUFFIX);
-    try (CompactionLogger logger = new CompactionLogger(logFile)) {
+    try (SimpleCompactionLogger logger = new SimpleCompactionLogger(logFile)) {
       initSeqFileInfo();
       recordLogBeforeDoingCompaction(logger);
 
@@ -165,6 +166,7 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
 
       // >>> 删除已经用完的源文件及其附属文件，顺序文件已经被重命名，不需要执行删除
       removeRemainingSourceFiles();
+      removeEmptyTargetFiles(logger);
       updateMetricsWithTargetFiles();
 
       // <<< 删除已经用完的源文件及其附属文件
@@ -240,7 +242,7 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
   @Override
   protected void recover() {}
 
-  private void recordLogBeforeDoingCompaction(CompactionLogger logger)
+  private void recordLogBeforeDoingCompaction(SimpleCompactionLogger logger)
       throws InPlaceCompactionErrorException {
     try {
       // record seq files in log
@@ -253,11 +255,10 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
       }
       // record unseq files in log
       for (InPlaceCompactionFile f : this.inPlaceCompactionUnSeqFiles) {
-        logger.logFile(f.getTsFileResource(), CompactionLogger.STR_SOURCE_FILES);
+        logger.logSourceFile(f.getTsFileResource());
       }
-      logger.logFiles(
-          TsFileNameGenerator.getCrossCompactionTargetFileResources(selectedSequenceFiles, false),
-          CompactionLogger.STR_TARGET_FILES);
+      logger.logTargetFiles(
+          TsFileNameGenerator.getCrossCompactionTargetFileResources(selectedSequenceFiles, false));
       logger.force();
     } catch (IOException e) {
       throw new InPlaceCompactionErrorException("error when recording log before compaction", e);
@@ -440,18 +441,43 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
     }
   }
 
+  private void removeEmptyTargetFiles(SimpleCompactionLogger logger)
+      throws InPlaceCompactionCleanupException {
+    try {
+      List<TsFileResource> emptyFiles = new ArrayList<>();
+      for (TsFileResource targetFile : targetFiles) {
+        if (targetFile.isDeleted()) {
+          logger.logEmptyTargetFile(targetFile);
+          emptyFiles.add(targetFile);
+        }
+      }
+      if (emptyFiles.isEmpty()) {
+        return;
+      }
+      logger.force();
+
+      for (TsFileResource emptyFile : emptyFiles) {
+        emptyFile.remove();
+      }
+    } catch (IOException e) {
+      throw new InPlaceCompactionCleanupException("Failed to remove empty target files", e);
+    }
+  }
+
   private void updateMetricsWithTargetFiles() {
     for (TsFileResource targetResource : targetFiles) {
-      FileMetrics.getInstance()
-          .addTsFile(
-              targetResource.getDatabaseName(),
-              targetResource.getDataRegionId(),
-              targetResource.getTsFileSize(),
-              true,
-              targetResource.getTsFile().getName());
-      if (targetResource.getModFile().exists()) {
-        FileMetrics.getInstance().increaseModFileNum(1);
-        FileMetrics.getInstance().increaseModFileSize(targetResource.getModFile().getSize());
+      if (!targetResource.isDeleted()) {
+        FileMetrics.getInstance()
+            .addTsFile(
+                targetResource.getDatabaseName(),
+                targetResource.getDataRegionId(),
+                targetResource.getTsFileSize(),
+                true,
+                targetResource.getTsFile().getName());
+        if (targetResource.getModFile().exists()) {
+          FileMetrics.getInstance().increaseModFileNum(1);
+          FileMetrics.getInstance().increaseModFileSize(targetResource.getModFile().getSize());
+        }
       }
     }
   }
