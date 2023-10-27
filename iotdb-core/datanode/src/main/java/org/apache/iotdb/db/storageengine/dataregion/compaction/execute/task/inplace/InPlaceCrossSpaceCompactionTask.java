@@ -129,7 +129,7 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
         (selectedSeqFileSize + selectedUnseqFileSize) / 1024 / 1024);
     File logFile =
         new File(
-            inPlaceCompactionSeqFiles.get(0).tsFileResource.getTsFile().getAbsolutePath()
+            inPlaceCompactionSeqFiles.get(0).tsFileResource.getTsFile().getPath()
                 + CompactionLogger.IN_PLACE_CROSS_COMPACTION_LOG_NAME_SUFFIX);
     try (SimpleCompactionLogger logger = new SimpleCompactionLogger(logFile)) {
       initSeqFileInfo();
@@ -486,7 +486,7 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
     try {
       for (TsFileResource seqFile : selectedSequenceFiles) {
         File targetTsFile = TsFileNameGenerator.getCrossSpaceCompactionTargetFile(seqFile, false);
-        String targetTsFilePath = targetTsFile.getAbsolutePath();
+        String targetTsFilePath = targetTsFile.getPath();
         File targetResourceFile = new File(targetTsFilePath + TsFileResource.RESOURCE_SUFFIX);
         File targetModsFile = new File(targetTsFilePath + TsFileResource.RESOURCE_SUFFIX);
         if (targetResourceFile.exists()) {

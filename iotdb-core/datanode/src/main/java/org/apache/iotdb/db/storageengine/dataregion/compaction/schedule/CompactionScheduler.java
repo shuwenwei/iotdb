@@ -20,6 +20,7 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.schedule;
 
 import org.apache.iotdb.commons.conf.IoTDBConstant;
+import org.apache.iotdb.consensus.ConsensusFactory;
 import org.apache.iotdb.db.conf.IoTDBConfig;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.FastCompactionPerformer;
@@ -139,7 +140,9 @@ public class CompactionScheduler {
     int trySubmitCount = 0;
     for (CrossCompactionTaskResource taskResource : taskList) {
       AbstractCrossSpaceCompactionTask task;
-      if (taskResource.containsHardLinkSourceFile()
+      if (!IoTDBDescriptor.getInstance().getConfig().isEnableInPlaceCrossSpaceCompaction()
+          || IoTDBDescriptor.getInstance().getConfig().getDataRegionConsensusProtocolClass().equals(ConsensusFactory.RATIS_CONSENSUS)
+          || taskResource.containsHardLinkSourceFile()
           || taskResource.isContainsLevelZeroFiles()
           || taskResource.getOverlapRatio() > 0.3) {
         task =

@@ -418,6 +418,12 @@ public class IoTDBConfig {
   /** Compact the unsequence files into the overlapped sequence files */
   private boolean enableCrossSpaceCompaction = true;
 
+  /**
+   * Compact the unsequence files into the overlapped sequence files, and skip the devices
+   * which is not overlapped with unsequence files
+   */
+  private boolean enableInPlaceCrossSpaceCompaction = false;
+
   /** Enable the service for MLNode */
   private boolean enableMLNodeService = false;
 
@@ -2644,6 +2650,14 @@ public class IoTDBConfig {
 
   public void setEnableCrossSpaceCompaction(boolean enableCrossSpaceCompaction) {
     this.enableCrossSpaceCompaction = enableCrossSpaceCompaction;
+  }
+
+  public boolean isEnableInPlaceCrossSpaceCompaction() {
+    return enableInPlaceCrossSpaceCompaction;
+  }
+
+  public void setEnableInPlaceCrossSpaceCompaction(boolean enableInPlaceCrossSpaceCompaction) {
+    this.enableInPlaceCrossSpaceCompaction = enableInPlaceCrossSpaceCompaction;
   }
 
   public boolean isEnableMLNodeService() {

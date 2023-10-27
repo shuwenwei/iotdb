@@ -473,6 +473,12 @@ public class IoTDBDescriptor {
     conf.setEnableCrossSpaceCompaction(
         Boolean.parseBoolean(
             properties.getProperty(
+                "enable_inplace_cross_space_compaction",
+                Boolean.toString(conf.isEnableInPlaceCrossSpaceCompaction()))));
+
+    conf.setEnableCrossSpaceCompaction(
+        Boolean.parseBoolean(
+            properties.getProperty(
                 "enable_cross_space_compaction",
                 Boolean.toString(conf.isEnableCrossSpaceCompaction()))));
 

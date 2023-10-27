@@ -225,6 +225,7 @@ public class TsFileIdentifier {
       File file = FSFactoryProducer.getFSFactory().getFile(dataDir, partialFileString);
       if (file.exists()
           || new File(file.getAbsolutePath() + TsFileResource.RESOURCE_SUFFIX).exists()
+          || new File(file.getAbsolutePath() + ModificationFile.COMPACTION_FILE_SUFFIX).exists()
           || new File(file.getAbsolutePath() + ModificationFile.FILE_SUFFIX).exists()
           || new File(
                   file.getAbsolutePath()
