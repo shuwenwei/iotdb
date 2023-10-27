@@ -141,7 +141,10 @@ public class CompactionScheduler {
     for (CrossCompactionTaskResource taskResource : taskList) {
       AbstractCrossSpaceCompactionTask task;
       if (!IoTDBDescriptor.getInstance().getConfig().isEnableInPlaceCrossSpaceCompaction()
-          || IoTDBDescriptor.getInstance().getConfig().getDataRegionConsensusProtocolClass().equals(ConsensusFactory.RATIS_CONSENSUS)
+          || IoTDBDescriptor.getInstance()
+              .getConfig()
+              .getDataRegionConsensusProtocolClass()
+              .equals(ConsensusFactory.RATIS_CONSENSUS)
           || taskResource.containsHardLinkSourceFile()
           || taskResource.isContainsLevelZeroFiles()
           || taskResource.getOverlapRatio() > 0.3) {

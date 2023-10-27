@@ -419,8 +419,8 @@ public class IoTDBConfig {
   private boolean enableCrossSpaceCompaction = true;
 
   /**
-   * Compact the unsequence files into the overlapped sequence files, and skip the devices
-   * which is not overlapped with unsequence files
+   * Compact the unsequence files into the overlapped sequence files, and skip the devices which is
+   * not overlapped with unsequence files
    */
   private boolean enableInPlaceCrossSpaceCompaction = false;
 
