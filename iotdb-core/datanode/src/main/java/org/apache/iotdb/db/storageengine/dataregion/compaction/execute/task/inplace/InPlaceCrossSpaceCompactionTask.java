@@ -236,6 +236,9 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
             logFile,
             e);
       }
+      for (TsFileResource targetFile : targetFiles) {
+        targetFile.setStatus(TsFileResourceStatus.NORMAL);
+      }
     }
   }
 
@@ -322,9 +325,6 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
             TsFileNameGenerator.getCrossSpaceCompactionTargetFile(resource, false).toPath();
         Files.move(sourceFilePath, targetFilePath);
         renamedFileMap.put(sourceFilePath, targetFilePath);
-      }
-      for (TsFileResource targetFile : targetFiles) {
-        targetFile.setStatus(TsFileResourceStatus.NORMAL);
       }
     } catch (Exception e) {
       // undo replace
