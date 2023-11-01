@@ -174,7 +174,8 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
         CompactionUtils.combineModsInCrossCompaction(
             selectedSequenceFiles, selectedUnsequenceFiles, targetTsfileResourceList);
 
-        validateCompactionResult(selectedSequenceFiles, selectedUnsequenceFiles, targetTsfileResourceList);
+        validateCompactionResult(
+            selectedSequenceFiles, selectedUnsequenceFiles, targetTsfileResourceList);
 
         // update tsfile resource in memory
         tsFileManager.replace(

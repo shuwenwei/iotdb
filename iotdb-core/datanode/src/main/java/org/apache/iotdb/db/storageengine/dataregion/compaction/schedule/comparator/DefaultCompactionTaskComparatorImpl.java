@@ -23,7 +23,6 @@ import org.apache.iotdb.db.conf.IoTDBConfig;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCrossSpaceCompactionTask;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CompactionTaskPriorityType;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InnerSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InsertionCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.constant.CompactionPriority;
@@ -46,7 +45,7 @@ public class DefaultCompactionTaskComparatorImpl implements ICompactionTaskCompa
       return 1;
     }
     if ((((o1 instanceof InnerSpaceCompactionTask)
-        && (o2 instanceof AbstractCrossSpaceCompactionTask))
+            && (o2 instanceof AbstractCrossSpaceCompactionTask))
         || ((o2 instanceof InnerSpaceCompactionTask)
             && (o1 instanceof AbstractCrossSpaceCompactionTask)))) {
       if (config.getCompactionPriority() == CompactionPriority.CROSS_INNER) {

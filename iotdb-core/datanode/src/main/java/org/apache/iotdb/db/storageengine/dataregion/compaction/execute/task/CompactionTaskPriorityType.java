@@ -42,7 +42,7 @@ public enum CompactionTaskPriorityType {
   /** the larger the value, the sooner it is executed */
   final int executePriority;
 
-  CompactionTaskType(int executePriority) {
+  CompactionTaskPriorityType(int executePriority) {
     this.executePriority = executePriority;
   }
 

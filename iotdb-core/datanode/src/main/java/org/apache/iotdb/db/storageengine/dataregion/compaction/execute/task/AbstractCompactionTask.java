@@ -373,10 +373,15 @@ public abstract class AbstractCompactionTask {
     return CompactionUtils.isDiskHasSpace();
   }
 
-  protected void validateCompactionResult(List<TsFileResource> sourceSeqFiles, List<TsFileResource> sourceUnseqFiles, List<TsFileResource> targetFiles) throws CompactionValidationFailedException {
+  protected void validateCompactionResult(
+      List<TsFileResource> sourceSeqFiles,
+      List<TsFileResource> sourceUnseqFiles,
+      List<TsFileResource> targetFiles)
+      throws CompactionValidationFailedException {
     CompactionTaskType taskType = getCompactionTaskType();
     boolean needToValidateTsFileCorrectness = taskType != CompactionTaskType.INSERTION;
-    boolean needToValidatePartitionSeqSpaceOverlap = getCompactionTaskType() == CompactionTaskType.INNER_UNSEQ;
+    boolean needToValidatePartitionSeqSpaceOverlap =
+        getCompactionTaskType() == CompactionTaskType.INNER_UNSEQ;
 
     TsFileValidator validator = TsFileValidator.getInstance();
     if (needToValidatePartitionSeqSpaceOverlap) {
@@ -392,8 +397,8 @@ public abstract class AbstractCompactionTask {
                     Long.parseLong(f2.getTsFile().getName().split("-")[0]));
             return timeDiff == 0
                 ? Long.compareUnsigned(
-                Long.parseLong(f1.getTsFile().getName().split("-")[1]),
-                Long.parseLong(f2.getTsFile().getName().split("-")[1]))
+                    Long.parseLong(f1.getTsFile().getName().split("-")[1]),
+                    Long.parseLong(f2.getTsFile().getName().split("-")[1]))
                 : timeDiff;
           });
       if (!validator.validateTsFilesIsHasNoOverlap(timePartitionSeqFiles)) {

@@ -246,5 +246,4 @@ public class CrossSpaceCompactionCandidate {
   public int getOverlapDeviceNumber() {
     return overlapDeviceNumber;
   }
-
 }

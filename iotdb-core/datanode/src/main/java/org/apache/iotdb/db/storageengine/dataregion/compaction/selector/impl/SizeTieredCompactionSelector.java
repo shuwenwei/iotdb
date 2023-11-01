@@ -196,7 +196,8 @@ public class SizeTieredCompactionSelector
       if (isLowEffectiveInfoRation || isLowDiskRatioAndFileRedundancy) {
         taskList.add(
             createCompactionTask(
-                Collections.singletonList(tsFileResource), CompactionTaskType.IN_PLACE_SETTLE));
+                Collections.singletonList(tsFileResource),
+                CompactionTaskPriorityType.IN_PLACE_SETTLE));
       }
     }
     return taskList;

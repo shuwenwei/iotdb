@@ -222,8 +222,7 @@ public class InnerSpaceCompactionTask extends AbstractCompactionTask {
         validateCompactionResult(
             sequence ? selectedTsFileResourceList : Collections.emptyList(),
             sequence ? Collections.emptyList() : selectedTsFileResourceList,
-            targetTsFileList
-        );
+            targetTsFileList);
 
         // replace the old files with new file, the new is in same position as the old
         if (sequence) {
@@ -247,7 +246,6 @@ public class InnerSpaceCompactionTask extends AbstractCompactionTask {
           isTargetTsFileEmpty = true;
           compactionLogger.force();
         }
-
 
         // replace the old files with new file, the new is in same position as the old
         tsFileManager.replace(

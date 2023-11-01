@@ -28,8 +28,8 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InnerSpaceCompactionTask;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InsertionCrossSpaceCompactionTask;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.ICompactionSelector;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.ICrossSpaceSelector;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.impl.RewriteCrossSpaceCompactionSelector;

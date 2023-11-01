@@ -27,7 +27,6 @@ import org.apache.iotdb.db.exception.StorageEngineException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCrossSpaceCompactionTask;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.validator.CompactionValidator;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.CompactionTaskManager;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.CompactionWorker;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.comparator.DefaultCompactionTaskComparatorImpl;
@@ -37,6 +36,7 @@ import org.apache.iotdb.db.storageengine.dataregion.modification.Modification;
 import org.apache.iotdb.db.storageengine.dataregion.modification.ModificationFile;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
+import org.apache.iotdb.db.storageengine.dataregion.utils.validate.TsFileValidator;
 import org.apache.iotdb.db.storageengine.rescon.memory.SystemInfo;
 import org.apache.iotdb.db.utils.ModificationUtils;
 import org.apache.iotdb.db.utils.datastructure.FixedPriorityBlockingQueue;
@@ -1722,7 +1722,7 @@ public class FastInplaceCompactionPerformerTest extends AbstractCompactionTest {
       Assert.assertEquals(TsFileResourceStatus.NORMAL, resource.getStatus());
       Assert.assertTrue(resource.getTsFile().exists());
       Assert.assertTrue(new File(tsFilePath + TsFileResource.RESOURCE_SUFFIX).exists());
-      Assert.assertTrue(CompactionValidator.getInstance().validateSingleTsFile(resource));
+      Assert.assertTrue(TsFileValidator.getInstance().validateTsFile(resource));
       Assert.assertTrue(resource.tryWriteLock());
       resource.writeUnlock();
     }

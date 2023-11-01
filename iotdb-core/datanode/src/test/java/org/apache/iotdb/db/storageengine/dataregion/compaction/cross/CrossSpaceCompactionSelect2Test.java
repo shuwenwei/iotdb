@@ -6,7 +6,7 @@ import org.apache.iotdb.db.exception.StorageEngineException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.AbstractCompactionTest;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCrossSpaceCompactionTask;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CompactionTaskType;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CompactionTaskPriorityType;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InnerSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCrossSpaceCompactionTask;
@@ -56,10 +56,10 @@ public class CrossSpaceCompactionSelect2Test extends AbstractCompactionTest {
         selector.selectInnerSpaceTask(seqResources);
     Assert.assertEquals(2, innerSpaceCompactionTasks.size());
     Assert.assertEquals(
-        CompactionTaskType.IN_PLACE_SETTLE,
+        CompactionTaskPriorityType.IN_PLACE_SETTLE,
         innerSpaceCompactionTasks.get(0).getCompactionTaskType());
     Assert.assertEquals(
-        CompactionTaskType.IN_PLACE_SETTLE,
+        CompactionTaskPriorityType.IN_PLACE_SETTLE,
         innerSpaceCompactionTasks.get(1).getCompactionTaskType());
   }
 
@@ -162,7 +162,7 @@ public class CrossSpaceCompactionSelect2Test extends AbstractCompactionTest {
                 taskResource.getTotalMemoryCost(),
                 tsFileManager.getNextCompactionTaskId());
       }
-      Assert.assertEquals(CompactionTaskType.NORMAL, task.getCompactionTaskType());
+      Assert.assertEquals(CompactionTaskPriorityType.NORMAL, task.getCompactionTaskType());
       Assert.assertEquals(1, taskResource.getOverlapRatio(), 0.1);
     }
     Assert.assertEquals(1, crossCompactionTaskResources.size());
@@ -200,7 +200,7 @@ public class CrossSpaceCompactionSelect2Test extends AbstractCompactionTest {
                 taskResource.getTotalMemoryCost(),
                 tsFileManager.getNextCompactionTaskId());
       }
-      Assert.assertEquals(CompactionTaskType.IN_PLACE, task.getCompactionTaskType());
+      Assert.assertEquals(CompactionTaskPriorityType.IN_PLACE, task.getCompactionTaskType());
       Assert.assertEquals(0.2, taskResource.getOverlapRatio(), 0.1);
     }
     Assert.assertEquals(1, crossCompactionTaskResources.size());
