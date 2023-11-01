@@ -20,6 +20,7 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.recover;
 
 import org.apache.iotdb.commons.conf.IoTDBConstant;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InsertionCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.CompactionLogger;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.rescon.disk.TierManager;
@@ -130,17 +131,18 @@ public class CompactionRecoverManager {
         CompactionLogger.findCompactionLogs(isInnerSpace, timePartitionDir.getPath());
     for (File compactionLog : compactionLogs) {
       logger.info("Calling compaction recover task.");
-      if (!isInnerSpace
-          && compactionLog
-              .getAbsolutePath()
-              .endsWith(CompactionLogger.IN_PLACE_CROSS_COMPACTION_LOG_NAME_SUFFIX)) {
-        new InPlaceCrossSpaceCompactionRecoverTask(
-                logicalStorageGroupName, dataRegionId, tsFileManager, compactionLog)
-            .doCompaction();
-      } else {
+      if (isInnerSpace || compactionLog.getAbsolutePath().endsWith(CompactionLogger.CROSS_COMPACTION_LOG_NAME_SUFFIX)) {
         new CompactionRecoverTask(
-                logicalStorageGroupName, dataRegionId, tsFileManager, compactionLog, isInnerSpace)
+            logicalStorageGroupName, dataRegionId, tsFileManager, compactionLog, isInnerSpace)
             .doCompaction();
+      } else if (compactionLog.getAbsolutePath().endsWith(CompactionLogger.INSERTION_COMPACTION_LOG_NAME_SUFFIX)) {
+        new InsertionCrossSpaceCompactionTask(
+            logicalStorageGroupName, dataRegionId, tsFileManager, compactionLog)
+            .recover();
+      } else if (compactionLog.getAbsolutePath().endsWith(CompactionLogger.IN_PLACE_CROSS_COMPACTION_LOG_NAME_SUFFIX)) {
+        new InPlaceCrossSpaceCompactionRecoverTask(
+            logicalStorageGroupName, dataRegionId, tsFileManager, compactionLog).
+            doCompaction();
       }
     }
   }

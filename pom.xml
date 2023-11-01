@@ -1192,11 +1192,6 @@
                 <version>${micrometer.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.micrometer</groupId>
-                <artifactId>micrometer-registry-jmx</artifactId>
-                <version>${micrometer.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-annotations</artifactId>
                 <version>${jackson.version}</version>
@@ -1729,6 +1724,11 @@
                 <groupId>org.apache.orc</groupId>
                 <artifactId>orc-shims</artifactId>
                 <version>${orc-core.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.glassfish.jersey.inject</groupId>
+                <artifactId>jersey-hk2</artifactId>
+                <version>${jersey.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -2666,7 +2666,7 @@
                                 <phase>generate-sources</phase>
                                 <configuration>
                                     <generator>py</generator>
-                                    <includes>**/common.thrift,**/client.thrift,**/datanode.thrift,**/confignode.thrift,**/mlnode.thrift</includes>
+                                    <includes>**/common.thrift,**/client.thrift,**/datanode.thrift,**/confignode.thrift</includes>
                                     <outputDirectory>${project.build.directory}/generated-sources-python/</outputDirectory>
                                 </configuration>
                             </execution>

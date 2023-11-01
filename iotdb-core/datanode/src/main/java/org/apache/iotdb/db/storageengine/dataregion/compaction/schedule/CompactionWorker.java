@@ -103,6 +103,7 @@ public class CompactionWorker implements Runnable {
     } finally {
       if (task != null) {
         task.resetCompactionCandidateStatusForAllSourceFiles();
+        task.handleTaskCleanup();
       }
       if (memoryAcquired) {
         SystemInfo.getInstance().resetCompactionMemoryCost(estimatedMemoryCost);

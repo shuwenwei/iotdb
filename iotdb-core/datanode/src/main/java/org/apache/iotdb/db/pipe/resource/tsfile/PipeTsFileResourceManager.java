@@ -106,8 +106,8 @@ public class PipeTsFileResourceManager {
   }
 
   private static String getPipeTsFileDirPath(File file) throws IOException {
-    while (!file.getName().equals(IoTDBConstant.SEQUENCE_FLODER_NAME)
-        && !file.getName().equals(IoTDBConstant.UNSEQUENCE_FLODER_NAME)) {
+    while (!file.getName().equals(IoTDBConstant.SEQUENCE_FOLDER_NAME)
+        && !file.getName().equals(IoTDBConstant.UNSEQUENCE_FOLDER_NAME)) {
       file = file.getParentFile();
     }
     return file.getParentFile().getCanonicalPath()
@@ -119,8 +119,8 @@ public class PipeTsFileResourceManager {
 
   private static String getRelativeFilePath(File file) {
     StringBuilder builder = new StringBuilder(file.getName());
-    while (!file.getName().equals(IoTDBConstant.SEQUENCE_FLODER_NAME)
-        && !file.getName().equals(IoTDBConstant.UNSEQUENCE_FLODER_NAME)) {
+    while (!file.getName().equals(IoTDBConstant.SEQUENCE_FOLDER_NAME)
+        && !file.getName().equals(IoTDBConstant.UNSEQUENCE_FOLDER_NAME)) {
       file = file.getParentFile();
       builder =
           new StringBuilder(file.getName())
@@ -191,5 +191,9 @@ public class PipeTsFileResourceManager {
 
   public synchronized void unpinTsFileResource(TsFileResource resource) throws IOException {
     decreaseFileReference(getHardlinkOrCopiedFileInPipeDir(resource.getTsFile()));
+  }
+
+  public int getLinkedTsfileCount() {
+    return hardlinkOrCopiedFileToReferenceMap.size();
   }
 }

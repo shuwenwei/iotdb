@@ -39,6 +39,7 @@ import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.ITimeIndex;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.timeindex.TimeIndexLevel;
 import org.apache.iotdb.db.storageengine.rescon.disk.TierManager;
 import org.apache.iotdb.db.utils.DateTimeUtils;
+import org.apache.iotdb.tsfile.common.constant.TsFileConstant;
 import org.apache.iotdb.tsfile.file.metadata.IChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.ITimeSeriesMetadata;
 import org.apache.iotdb.tsfile.fileSystem.FSFactoryProducer;
@@ -58,8 +59,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.channels.FileChannel;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -159,6 +162,7 @@ public class TsFileResource {
   private double effectiveInfoRatio = 1;
   private long dataSize;
   private boolean hasHardLink = false;
+  private boolean isInsertionCompactionTaskCandidate = true;
 
   public TsFileResource() {}
 
@@ -324,7 +328,15 @@ public class TsFileResource {
   }
 
   public boolean resourceFileExists() {
-    return fsFactory.getFile(file + RESOURCE_SUFFIX).exists();
+    return file != null && fsFactory.getFile(file + RESOURCE_SUFFIX).exists();
+  }
+
+  public boolean tsFileExists() {
+    return file != null && file.exists();
+  }
+
+  public boolean modFileExists() {
+    return getModFile().exists();
   }
 
   public List<IChunkMetadata> getChunkMetadataList(PartialPath seriesPath) {
@@ -754,6 +766,16 @@ public class TsFileResource {
   private boolean isSatisfied(Filter timeFilter, boolean isSeq, long ttl, boolean debug) {
     long startTime = getFileStartTime();
     long endTime = isClosed() || !isSeq ? getFileEndTime() : Long.MAX_VALUE;
+    if (startTime > endTime) {
+      // startTime > endTime indicates that there is something wrong with this TsFile. Return false
+      // directly, or it may lead to infinite loop in GroupByMonthFilter#getTimePointPosition.
+      LOGGER.warn(
+          "startTime[{}] of TsFileResource[{}] is greater than its endTime[{}]",
+          startTime,
+          this,
+          endTime);
+      return false;
+    }
 
     if (!isAlive(endTime, ttl)) {
       if (debug) {
@@ -784,6 +806,16 @@ public class TsFileResource {
 
     long startTime = getStartTime(deviceId);
     long endTime = isClosed() || !isSeq ? getEndTime(deviceId) : Long.MAX_VALUE;
+    if (startTime > endTime) {
+      // startTime > endTime indicates that there is something wrong with this TsFile. Return false
+      // directly, or it may lead to infinite loop in GroupByMonthFilter#getTimePointPosition.
+      LOGGER.warn(
+          "startTime[{}] of TsFileResource[{}] is greater than its endTime[{}]",
+          startTime,
+          this,
+          endTime);
+      return false;
+    }
 
     if (timeFilter != null) {
       boolean res = timeFilter.satisfyStartEndTime(startTime, endTime);
@@ -1109,7 +1141,7 @@ public class TsFileResource {
             : maxProgressIndex.updateToMinimumIsAfterProgressIndex(progressIndex));
   }
 
-  public void recoverProgressIndex(ProgressIndex progressIndex) {
+  public void setProgressIndex(ProgressIndex progressIndex) {
     if (progressIndex == null) {
       return;
     }
@@ -1127,6 +1159,10 @@ public class TsFileResource {
 
   public ProgressIndex getMaxProgressIndex() {
     return maxProgressIndex == null ? MinimumProgressIndex.INSTANCE : maxProgressIndex;
+  }
+
+  public boolean isEmpty() {
+    return getDevices().isEmpty();
   }
 
   public String getDatabaseName() {
@@ -1225,5 +1261,13 @@ public class TsFileResource {
 
   public boolean isHasHardLink() {
     return hasHardLink;
+  }
+
+  public boolean isInsertionCompactionTaskCandidate() {
+    return !isSeq && isInsertionCompactionTaskCandidate;
+  }
+
+  public void setInsertionCompactionTaskCandidate(boolean insertionCompactionTaskCandidate) {
+    isInsertionCompactionTaskCandidate = insertionCompactionTaskCandidate;
   }
 }

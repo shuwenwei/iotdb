@@ -42,7 +42,7 @@ public abstract class AbstractCrossSpaceCompactionTask extends AbstractCompactio
       ICrossCompactionPerformer performer,
       long memoryCost,
       long serialId,
-      CompactionTaskType compactionTaskType) {
+      CompactionTaskPriorityType compactionTaskType) {
     super(
         tsFileManager.getStorageGroupName(),
         tsFileManager.getDataRegionId(),
@@ -82,7 +82,7 @@ public abstract class AbstractCrossSpaceCompactionTask extends AbstractCompactio
         performer,
         memoryCost,
         serialId,
-        CompactionTaskType.NORMAL);
+        CompactionTaskPriorityType.NORMAL);
   }
 
   protected AbstractCrossSpaceCompactionTask(
@@ -91,7 +91,7 @@ public abstract class AbstractCrossSpaceCompactionTask extends AbstractCompactio
       long timePartition,
       TsFileManager tsFileManager,
       long serialId,
-      CompactionTaskType compactionTaskType) {
+      CompactionTaskPriorityType compactionTaskType) {
     super(
         storageGroupName, dataRegionId, timePartition, tsFileManager, serialId, compactionTaskType);
   }

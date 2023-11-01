@@ -33,6 +33,7 @@ public class CompactionLogger implements AutoCloseable {
       ".in-place-cross-compaction.log";
   public static final String CROSS_COMPACTION_LOG_NAME_SUFFIX = ".cross-compaction.log";
   public static final String INNER_COMPACTION_LOG_NAME_SUFFIX = ".inner-compaction.log";
+  public static final String INSERTION_COMPACTION_LOG_NAME_SUFFIX = ".insertion-compaction.log";
 
   public static final String STR_SOURCE_FILES = "source";
   public static final String STR_TARGET_FILES = "target";
@@ -94,7 +95,8 @@ public class CompactionLogger implements AutoCloseable {
               return name.endsWith(INNER_COMPACTION_LOG_NAME_SUFFIX);
             } else {
               return name.endsWith(CROSS_COMPACTION_LOG_NAME_SUFFIX)
-                  || name.endsWith(IN_PLACE_CROSS_COMPACTION_LOG_NAME_SUFFIX);
+                  || name.endsWith(IN_PLACE_CROSS_COMPACTION_LOG_NAME_SUFFIX)
+                  || name.endsWith(INSERTION_COMPACTION_LOG_NAME_SUFFIX);
             }
           });
     } else {

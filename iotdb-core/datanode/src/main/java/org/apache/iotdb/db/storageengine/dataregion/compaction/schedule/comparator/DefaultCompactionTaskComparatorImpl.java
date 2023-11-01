@@ -23,7 +23,9 @@ import org.apache.iotdb.db.conf.IoTDBConfig;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCrossSpaceCompactionTask;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CompactionTaskPriorityType;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InnerSpaceCompactionTask;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InsertionCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.constant.CompactionPriority;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 
@@ -35,8 +37,16 @@ public class DefaultCompactionTaskComparatorImpl implements ICompactionTaskCompa
   @SuppressWarnings({"squid:S3776", "javabugs:S6320"})
   @Override
   public int compare(AbstractCompactionTask o1, AbstractCompactionTask o2) {
+    if (o1 instanceof InsertionCrossSpaceCompactionTask
+        && o2 instanceof InsertionCrossSpaceCompactionTask) {
+      return o1.getSerialId() < o2.getSerialId() ? -1 : 1;
+    } else if (o1 instanceof InsertionCrossSpaceCompactionTask) {
+      return -1;
+    } else if (o2 instanceof InsertionCrossSpaceCompactionTask) {
+      return 1;
+    }
     if ((((o1 instanceof InnerSpaceCompactionTask)
-            && (o2 instanceof AbstractCrossSpaceCompactionTask))
+        && (o2 instanceof AbstractCrossSpaceCompactionTask))
         || ((o2 instanceof InnerSpaceCompactionTask)
             && (o1 instanceof AbstractCrossSpaceCompactionTask)))) {
       if (config.getCompactionPriority() == CompactionPriority.CROSS_INNER) {
@@ -69,8 +79,8 @@ public class DefaultCompactionTaskComparatorImpl implements ICompactionTaskCompa
     // we prefer to execute task type with MOD_SETTLE
     if (o1.getCompactionTaskType() != o2.getCompactionTaskType()) {
       return Integer.compare(
-          o2.getCompactionTaskType().getExecutePriority(),
-          o1.getCompactionTaskType().getExecutePriority());
+          o2.getCompactionTaskPriorityType().getExecutePriority(),
+          o1.getCompactionTaskPriorityType().getExecutePriority());
     }
 
     // if max mods file size of o1 and o2 are different

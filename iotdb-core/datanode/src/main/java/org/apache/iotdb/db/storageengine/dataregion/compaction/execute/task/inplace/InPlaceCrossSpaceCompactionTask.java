@@ -28,12 +28,11 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.InPlaceFastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.AbstractCrossSpaceCompactionTask;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CompactionTaskType;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CompactionTaskPriorityType;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.InPlaceFastCompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.CompactionLogger;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.SimpleCompactionLogger;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.validator.CompactionValidator;
 import org.apache.iotdb.db.storageengine.dataregion.read.control.FileReaderManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
@@ -75,7 +74,7 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
         performer,
         memoryCost,
         serialId,
-        CompactionTaskType.IN_PLACE);
+        CompactionTaskPriorityType.IN_PLACE);
     // generate a copy of all source seq TsFileResource in memory
     this.targetFiles =
         selectedSequenceFiles.stream()
@@ -145,18 +144,7 @@ public class InPlaceCrossSpaceCompactionTask extends AbstractCrossSpaceCompactio
       prepareAdjuvantFilesOfTargetResources();
 
       // 对目标文件进行重叠验证和文件正确性验证
-      CompactionValidator validator = CompactionValidator.getInstance();
-      if (!validator.validateCompaction(
-          storageGroupName,
-          tsFileManager,
-          timePartition,
-          selectedSequenceFiles,
-          selectedUnsequenceFiles,
-          targetFiles,
-          false,
-          true)) {
-        throw new CompactionValidationFailedException("Failed to pass compaction validation");
-      }
+      validateCompactionResult(selectedSequenceFiles, selectedUnsequenceFiles, targetFiles);
 
       atomicReplace();
 

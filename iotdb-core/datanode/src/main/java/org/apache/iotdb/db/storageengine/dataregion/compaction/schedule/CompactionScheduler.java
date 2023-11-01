@@ -29,15 +29,19 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.Abst
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InnerSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCrossSpaceCompactionTask;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.InsertionCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.ICompactionSelector;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.ICrossSpaceSelector;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.impl.RewriteCrossSpaceCompactionSelector;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.utils.CrossCompactionTaskResource;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.selector.utils.InsertionCrossCompactionTaskResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.concurrent.Phaser;
 
 /**
  * CompactionScheduler schedules and submits the compaction task periodically, and it counts the
@@ -74,6 +78,22 @@ public class CompactionScheduler {
       trySubmitCount += tryToSubmitCrossSpaceCompactionTask(tsFileManager, timePartition);
       trySubmitCount += tryToSubmitInnerSpaceCompactionTask(tsFileManager, timePartition, true);
       trySubmitCount += tryToSubmitInnerSpaceCompactionTask(tsFileManager, timePartition, false);
+    } catch (InterruptedException e) {
+      LOGGER.error("Exception occurs when selecting compaction tasks", e);
+      Thread.currentThread().interrupt();
+    }
+    return trySubmitCount;
+  }
+
+  public static int scheduleInsertionCompaction(
+      TsFileManager tsFileManager, long timePartition, Phaser insertionTaskPhaser) {
+    if (!tsFileManager.isAllowCompaction()) {
+      return 0;
+    }
+    int trySubmitCount = 0;
+    try {
+      trySubmitCount +=
+          tryToSubmitInsertionCompactionTask(tsFileManager, timePartition, insertionTaskPhaser);
     } catch (InterruptedException e) {
       LOGGER.error("Exception occurs when selecting compaction tasks", e);
       Thread.currentThread().interrupt();
@@ -120,6 +140,41 @@ public class CompactionScheduler {
     return trySubmitCount;
   }
 
+  private static int tryToSubmitInsertionCompactionTask(
+      TsFileManager tsFileManager, long timePartition, Phaser insertionTaskPhaser)
+      throws InterruptedException {
+    if (!config.isEnableInsertionCrossSpaceCompaction()) {
+      return 0;
+    }
+    String logicalStorageGroupName = tsFileManager.getStorageGroupName();
+    String dataRegionId = tsFileManager.getDataRegionId();
+    RewriteCrossSpaceCompactionSelector selector =
+        new RewriteCrossSpaceCompactionSelector(
+            logicalStorageGroupName, dataRegionId, timePartition, tsFileManager);
+
+    List<CrossCompactionTaskResource> selectedTasks =
+        selector.selectInsertionCrossSpaceTask(
+            tsFileManager.getOrCreateSequenceListByTimePartition(timePartition),
+            tsFileManager.getOrCreateUnsequenceListByTimePartition(timePartition));
+    if (selectedTasks.isEmpty()) {
+      return 0;
+    }
+
+    InsertionCrossSpaceCompactionTask task =
+        new InsertionCrossSpaceCompactionTask(
+            insertionTaskPhaser,
+            timePartition,
+            tsFileManager,
+            (InsertionCrossCompactionTaskResource) selectedTasks.get(0),
+            tsFileManager.getNextCompactionTaskId());
+    insertionTaskPhaser.register();
+    if (!CompactionTaskManager.getInstance().addTaskToWaitingQueue(task)) {
+      insertionTaskPhaser.arrive();
+      return 0;
+    }
+    return 1;
+  }
+
   private static int tryToSubmitCrossSpaceCompactionTask(
       TsFileManager tsFileManager, long timePartition) throws InterruptedException {
     if (!config.isEnableCrossSpaceCompaction()) {
@@ -131,6 +186,7 @@ public class CompactionScheduler {
         config
             .getCrossCompactionSelector()
             .createInstance(logicalStorageGroupName, dataRegionId, timePartition, tsFileManager);
+
     List<CrossCompactionTaskResource> taskList =
         crossSpaceCompactionSelector.selectCrossSpaceTask(
             tsFileManager.getOrCreateSequenceListByTimePartition(timePartition),

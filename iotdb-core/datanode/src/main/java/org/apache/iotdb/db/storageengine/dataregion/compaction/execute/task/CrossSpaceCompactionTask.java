@@ -23,7 +23,6 @@ import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.db.service.metrics.CompactionMetrics;
 import org.apache.iotdb.db.service.metrics.FileMetrics;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionRecoverException;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionValidationFailedException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICrossCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl.FastCompactionPerformer;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.FastCompactionTaskSummary;
@@ -32,7 +31,6 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.CompactionLogger;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.SimpleCompactionLogger;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.TsFileIdentifier;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.validator.CompactionValidator;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
@@ -78,7 +76,7 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
 
   public CrossSpaceCompactionTask(
       String databaseName, String dataRegionId, TsFileManager tsFileManager, File logFile) {
-    super(databaseName, dataRegionId, 0L, tsFileManager, 0L, CompactionTaskType.NORMAL);
+    super(databaseName, dataRegionId, 0L, tsFileManager, 0L, CompactionTaskPriorityType.NORMAL);
     this.logFile = logFile;
     this.needRecoverTaskInfoFromLogFile = true;
   }
@@ -176,26 +174,7 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
         CompactionUtils.combineModsInCrossCompaction(
             selectedSequenceFiles, selectedUnsequenceFiles, targetTsfileResourceList);
 
-        CompactionValidator validator = CompactionValidator.getInstance();
-        if (!validator.validateCompaction(
-            storageGroupName,
-            tsFileManager,
-            timePartition,
-            selectedSequenceFiles,
-            selectedUnsequenceFiles,
-            targetTsfileResourceList,
-            false,
-            false)) {
-          LOGGER.error(
-              "Failed to pass compaction validation, "
-                  + "source sequence files is: {}, "
-                  + "unsequence files is {}, "
-                  + "target files is {}",
-              selectedSequenceFiles,
-              selectedUnsequenceFiles,
-              targetTsfileResourceList);
-          throw new CompactionValidationFailedException("Failed to pass compaction validation");
-        }
+        validateCompactionResult(selectedSequenceFiles, selectedUnsequenceFiles, targetTsfileResourceList);
 
         // update tsfile resource in memory
         tsFileManager.replace(
