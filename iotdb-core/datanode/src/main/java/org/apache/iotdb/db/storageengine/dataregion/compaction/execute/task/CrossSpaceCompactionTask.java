@@ -330,15 +330,6 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
   }
 
   @Override
-  public boolean equals(Object other) {
-    if (!(other instanceof CrossSpaceCompactionTask)) {
-      return false;
-    }
-
-    return equalsOtherTask((AbstractCompactionTask) other);
-  }
-
-  @Override
   public boolean equalsOtherTask(AbstractCompactionTask otherTask) {
     if (!(otherTask instanceof CrossSpaceCompactionTask)) {
       return false;
@@ -354,6 +345,49 @@ public class CrossSpaceCompactionTask extends AbstractCrossSpaceCompactionTask {
       tsFileResource.writeUnlock();
     }
     holdWriteLockList.clear();
+  }
+
+  public List<TsFileResource> getSelectedSequenceFiles() {
+    return selectedSequenceFiles;
+  }
+
+  @Override
+  public List<TsFileResource> getAllSourceTsFiles() {
+    List<TsFileResource> allRelatedFiles = new ArrayList<>();
+    allRelatedFiles.addAll(selectedSequenceFiles);
+    allRelatedFiles.addAll(selectedUnsequenceFiles);
+    return allRelatedFiles;
+  }
+
+  public List<TsFileResource> getSelectedUnsequenceFiles() {
+    return selectedUnsequenceFiles;
+  }
+
+  @Override
+  public String toString() {
+    return storageGroupName
+        + "-"
+        + dataRegionId
+        + "-"
+        + timePartition
+        + " task seq files are "
+        + selectedSequenceFiles.toString()
+        + " , unseq files are "
+        + selectedUnsequenceFiles.toString();
+  }
+
+  @Override
+  public int hashCode() {
+    return hashCode;
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (!(other instanceof CrossSpaceCompactionTask)) {
+      return false;
+    }
+
+    return equalsOtherTask((CrossSpaceCompactionTask) other);
   }
 
   private void lockWrite(List<TsFileResource> tsFileResourceList) {

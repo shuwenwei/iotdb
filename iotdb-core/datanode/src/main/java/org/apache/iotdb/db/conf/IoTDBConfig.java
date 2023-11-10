@@ -805,9 +805,6 @@ public class IoTDBConfig {
 
   private float udfCollectorMemoryBudgetInMB = (float) (1.0 / 3 * udfMemoryBudgetInMB);
 
-  // time in nanosecond precision when starting up
-  private long startUpNanosecond = System.nanoTime();
-
   /** Unit: byte */
   private int thriftMaxFrameSize = 536870912;
 
@@ -1062,12 +1059,6 @@ public class IoTDBConfig {
 
   /** whether to enable the audit log * */
   private boolean enableAuditLog = false;
-
-  /** This configuration parameter sets the level at which the time series limit is applied.* */
-  private String clusterSchemaLimitLevel = "timeseries";
-
-  /** This configuration parameter sets the maximum number of schema allowed in the cluster.* */
-  private long clusterSchemaLimitThreshold = -1;
 
   /** Output location of audit logs * */
   private List<AuditLogStorage> auditLogStorage =
@@ -1414,7 +1405,7 @@ public class IoTDBConfig {
     return systemDir;
   }
 
-  void setSystemDir(String systemDir) {
+  public void setSystemDir(String systemDir) {
     this.systemDir = systemDir;
   }
 
@@ -1438,7 +1429,7 @@ public class IoTDBConfig {
     return queryDir;
   }
 
-  void setQueryDir(String queryDir) {
+  public void setQueryDir(String queryDir) {
     this.queryDir = queryDir;
   }
 
@@ -2522,10 +2513,6 @@ public class IoTDBConfig {
 
   public void setPrimitiveArraySize(int primitiveArraySize) {
     this.primitiveArraySize = primitiveArraySize;
-  }
-
-  public long getStartUpNanosecond() {
-    return startUpNanosecond;
   }
 
   public int getThriftMaxFrameSize() {
@@ -3775,22 +3762,6 @@ public class IoTDBConfig {
 
   public String getSortTmpDir() {
     return sortTmpDir;
-  }
-
-  public String getClusterSchemaLimitLevel() {
-    return clusterSchemaLimitLevel;
-  }
-
-  public void setClusterSchemaLimitLevel(String clusterSchemaLimitLevel) {
-    this.clusterSchemaLimitLevel = clusterSchemaLimitLevel;
-  }
-
-  public long getClusterSchemaLimitThreshold() {
-    return clusterSchemaLimitThreshold;
-  }
-
-  public void setClusterSchemaLimitThreshold(long clusterSchemaLimitThreshold) {
-    this.clusterSchemaLimitThreshold = clusterSchemaLimitThreshold;
   }
 
   public String getObjectStorageBucket() {

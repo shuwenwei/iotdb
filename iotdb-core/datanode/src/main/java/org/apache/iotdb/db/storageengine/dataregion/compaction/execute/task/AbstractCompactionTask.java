@@ -44,7 +44,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * AbstractCompactionTask is the base class for all compaction task, it carries out the execution of
@@ -104,7 +106,7 @@ public abstract class AbstractCompactionTask {
     this.compactionTaskPriorityType = compactionTaskPriorityType;
   }
 
-  protected abstract List<TsFileResource> getAllSourceTsFiles();
+  public abstract List<TsFileResource> getAllSourceTsFiles();
 
   /**
    * This method will try to set the files to COMPACTION_CANDIDATE. If failed, it should roll back
@@ -378,6 +380,9 @@ public abstract class AbstractCompactionTask {
       List<TsFileResource> sourceUnseqFiles,
       List<TsFileResource> targetFiles)
       throws CompactionValidationFailedException {
+    // skip TsFileResource which is marked as DELETED status
+    List<TsFileResource> validTargetFiles =
+        targetFiles.stream().filter(resource -> !resource.isDeleted()).collect(Collectors.toList());
     CompactionTaskType taskType = getCompactionTaskType();
     boolean needToValidateTsFileCorrectness = taskType != CompactionTaskType.INSERTION;
     boolean needToValidatePartitionSeqSpaceOverlap =
@@ -386,9 +391,9 @@ public abstract class AbstractCompactionTask {
     TsFileValidator validator = TsFileValidator.getInstance();
     if (needToValidatePartitionSeqSpaceOverlap) {
       List<TsFileResource> timePartitionSeqFiles =
-          tsFileManager.getCopyOfSequenceListByTimePartition(timePartition);
+          new ArrayList<>(tsFileManager.getOrCreateSequenceListByTimePartition(timePartition));
       timePartitionSeqFiles.removeAll(sourceSeqFiles);
-      timePartitionSeqFiles.addAll(targetFiles);
+      timePartitionSeqFiles.addAll(validTargetFiles);
       timePartitionSeqFiles.sort(
           (f1, f2) -> {
             int timeDiff =
@@ -402,14 +407,22 @@ public abstract class AbstractCompactionTask {
                 : timeDiff;
           });
       if (!validator.validateTsFilesIsHasNoOverlap(timePartitionSeqFiles)) {
-        LOGGER.error("Failed to pass compaction validation, target files is {}", targetFiles);
+        LOGGER.error(
+            "Failed to pass compaction validation, source seq files: {}, source unseq files: {}, target files: {}",
+            sourceSeqFiles,
+            sourceUnseqFiles,
+            targetFiles);
         throw new CompactionValidationFailedException(
             "Failed to pass compaction validation, sequence files has overlap, time partition id is "
                 + timePartition);
       }
     }
-    if (needToValidateTsFileCorrectness && !validator.validateTsFiles(targetFiles)) {
-      LOGGER.error("Failed to pass compaction validation, target files is {}", targetFiles);
+    if (needToValidateTsFileCorrectness && !validator.validateTsFiles(validTargetFiles)) {
+      LOGGER.error(
+          "Failed to pass compaction validation, source seq files: {}, source unseq files: {}, target files: {}",
+          sourceSeqFiles,
+          sourceUnseqFiles,
+          targetFiles);
       throw new CompactionValidationFailedException(
           "Failed to pass compaction validation, .resources file or tsfile data is wrong");
     }
