@@ -25,6 +25,7 @@ public class CompactionScheduleSummary {
   private int submitSeqInnerSpaceCompactionTaskNum = 0;
   private int submitUnseqInnerSpaceCompactionTaskNum = 0;
   private int submitCrossSpaceCompactionTaskNum = 0;
+  private int submitInPlaceCrossSpaceCompactionTaskNum = 0;
   private int submitInsertionCrossSpaceCompactionTaskNum = 0;
 
   public void incrementSubmitTaskNum(CompactionTaskType taskType, int num) {
@@ -38,6 +39,9 @@ public class CompactionScheduleSummary {
       case CROSS:
         submitCrossSpaceCompactionTaskNum += num;
         break;
+      case IN_PLACE_CROSS:
+        submitInPlaceCrossSpaceCompactionTaskNum += num;
+        break;
       case INSERTION:
         submitInsertionCrossSpaceCompactionTaskNum += num;
         break;
@@ -48,6 +52,10 @@ public class CompactionScheduleSummary {
 
   public int getSubmitCrossSpaceCompactionTaskNum() {
     return submitCrossSpaceCompactionTaskNum;
+  }
+
+  public int getSubmitInPlaceCrossSpaceCompactionTaskNum() {
+    return submitInPlaceCrossSpaceCompactionTaskNum;
   }
 
   public int getSubmitInsertionCrossSpaceCompactionTaskNum() {

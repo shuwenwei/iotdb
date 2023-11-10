@@ -28,6 +28,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.constant.Compacti
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.CompactionValidationFailedException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.exception.FileCannotTransitToCompactingException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.ICompactionPerformer;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.inplace.InPlaceCrossSpaceCompactionTask;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.CompactionTaskStage;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.log.TsFileIdentifier;
@@ -429,7 +430,9 @@ public abstract class AbstractCompactionTask {
   }
 
   public CompactionTaskType getCompactionTaskType() {
-    if (this instanceof CrossSpaceCompactionTask) {
+    if (this instanceof InPlaceCrossSpaceCompactionTask) {
+      return CompactionTaskType.IN_PLACE_CROSS;
+    } else if (this instanceof CrossSpaceCompactionTask) {
       return CompactionTaskType.CROSS;
     } else if (this instanceof InsertionCrossSpaceCompactionTask) {
       return CompactionTaskType.INSERTION;

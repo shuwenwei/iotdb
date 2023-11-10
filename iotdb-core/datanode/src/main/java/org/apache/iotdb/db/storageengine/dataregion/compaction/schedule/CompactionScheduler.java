@@ -250,9 +250,9 @@ public class CompactionScheduler {
 
       if (CompactionTaskManager.getInstance().addTaskToWaitingQueue(task)) {
         trySubmitCount++;
+        summary.incrementSubmitTaskNum(task.getCompactionTaskType(), 1);
       }
     }
-    summary.incrementSubmitTaskNum(CompactionTaskType.CROSS, trySubmitCount);
     return trySubmitCount;
   }
 }

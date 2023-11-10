@@ -2141,11 +2141,16 @@ public class DataRegion implements IDataRegionForQuery {
       logger.error("Meet error in compaction schedule.", e);
     }
     logger.info(
-        "[CompactionScheduler][{}] selected sequence InnerSpaceCompactionTask num is {}, selected unsequence InnerSpaceCompactionTask num is {}, selected CrossSpaceCompactionTask num is {}, selected InsertionCrossSpaceCompactionTask num is {}",
+        "[CompactionScheduler][{}] selected sequence InnerSpaceCompactionTask num is {},"
+            + " selected unsequence InnerSpaceCompactionTask num is {},"
+            + " selected CrossSpaceCompactionTask num is {},"
+            + " selected InPlaceCrossSpaceCompactionTask num is {}, "
+            + "selected InsertionCrossSpaceCompactionTask num is {}",
         dataRegionId,
         summary.getSubmitSeqInnerSpaceCompactionTaskNum(),
         summary.getSubmitUnseqInnerSpaceCompactionTaskNum(),
         summary.getSubmitCrossSpaceCompactionTaskNum(),
+        summary.getSubmitInPlaceCrossSpaceCompactionTaskNum(),
         summary.getSubmitInsertionCrossSpaceCompactionTaskNum());
     CompactionMetrics.getInstance().updateCompactionTaskSelectionNum(summary);
     return trySubmitCount;

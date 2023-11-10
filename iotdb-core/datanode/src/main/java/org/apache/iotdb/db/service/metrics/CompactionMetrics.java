@@ -58,14 +58,17 @@ public class CompactionMetrics implements IMetricSet {
   private final AtomicInteger waitingSeqInnerCompactionTaskNum = new AtomicInteger(0);
   private final AtomicInteger waitingUnseqInnerCompactionTaskNum = new AtomicInteger(0);
   private final AtomicInteger waitingCrossCompactionTaskNum = new AtomicInteger(0);
+  private final AtomicInteger waitingInPlaceCrossCompactionTaskNum = new AtomicInteger(0);
   private final AtomicInteger waitingInsertionCompactionTaskNum = new AtomicInteger(0);
   private final AtomicInteger runningSeqInnerCompactionTaskNum = new AtomicInteger(0);
   private final AtomicInteger runningUnseqInnerCompactionTaskNum = new AtomicInteger(0);
   private final AtomicInteger runningCrossCompactionTaskNum = new AtomicInteger(0);
+  private final AtomicInteger runningInPlaceCrossCompactionTaskNum = new AtomicInteger(0);
   private final AtomicInteger runningInsertionCompactionTaskNum = new AtomicInteger(0);
   private final AtomicInteger finishSeqInnerCompactionTaskNum = new AtomicInteger(0);
   private final AtomicInteger finishUnseqInnerCompactionTaskNum = new AtomicInteger(0);
   private final AtomicInteger finishCrossCompactionTaskNum = new AtomicInteger(0);
+  private final AtomicInteger finishInPlaceCrossCompactionTaskNum = new AtomicInteger(0);
   private final AtomicInteger finishInsertionCompactionTaskNum = new AtomicInteger(0);
   // compaction type -> Counter[ Not-Aligned, Aligned, Metadata]
   private final Map<String, Counter[]> writeCounters = new ConcurrentHashMap<>();
@@ -298,10 +301,15 @@ public class CompactionMetrics implements IMetricSet {
   private Timer seqCompactionCostTimer = DoNothingMetricManager.DO_NOTHING_TIMER;
   private Timer unSeqCompactionCostTimer = DoNothingMetricManager.DO_NOTHING_TIMER;
   private Timer crossCompactionCostTimer = DoNothingMetricManager.DO_NOTHING_TIMER;
+  private Timer inPlaceCrossCompactionCostTimer = DoNothingMetricManager.DO_NOTHING_TIMER;
   private Timer insertionCompactionCostTimer = DoNothingMetricManager.DO_NOTHING_TIMER;
 
   public void recordTaskFinishOrAbort(CompactionTaskType type, long timeCost) {
     switch (type) {
+      case IN_PLACE_CROSS:
+        finishInPlaceCrossCompactionTaskNum.incrementAndGet();
+        inPlaceCrossCompactionCostTimer.update(timeCost, TimeUnit.MILLISECONDS);
+        break;
       case CROSS:
         finishCrossCompactionTaskNum.incrementAndGet();
         crossCompactionCostTimer.update(timeCost, TimeUnit.MILLISECONDS);
@@ -337,6 +345,9 @@ public class CompactionMetrics implements IMetricSet {
     crossCompactionCostTimer =
         metricService.getOrCreateTimer(
             Metric.COST_TASK.toString(), MetricLevel.CORE, Tag.NAME.toString(), "cross_compaction");
+    inPlaceCrossCompactionCostTimer =
+        metricService.getOrCreateTimer(
+            Metric.COST_TASK.toString(), MetricLevel.CORE, Tag.NAME.toString(), "cross_compaction");
     insertionCompactionCostTimer =
         metricService.getOrCreateTimer(
             Metric.COST_TASK.toString(),
@@ -353,6 +364,18 @@ public class CompactionMetrics implements IMetricSet {
         },
         Tag.NAME.toString(),
         "compaction_cross",
+        Tag.STATUS.toString(),
+        "waiting");
+    metricService.createAutoGauge(
+        Metric.QUEUE.toString(),
+        MetricLevel.IMPORTANT,
+        this,
+        (metrics) -> {
+          updateCompactionTaskInfo();
+          return waitingInPlaceCrossCompactionTaskNum.get();
+        },
+        Tag.NAME.toString(),
+        "compaction_in_place_cross",
         Tag.STATUS.toString(),
         "waiting");
     metricService.createAutoGauge(
@@ -401,6 +424,18 @@ public class CompactionMetrics implements IMetricSet {
         },
         Tag.NAME.toString(),
         "compaction_cross",
+        Tag.STATUS.toString(),
+        "running");
+    metricService.createAutoGauge(
+        Metric.QUEUE.toString(),
+        MetricLevel.IMPORTANT,
+        this,
+        (metrics) -> {
+          updateCompactionTaskInfo();
+          return runningInPlaceCrossCompactionTaskNum.get();
+        },
+        Tag.NAME.toString(),
+        "compaction_in_place_cross",
         Tag.STATUS.toString(),
         "running");
     metricService.createAutoGauge(
@@ -475,6 +510,16 @@ public class CompactionMetrics implements IMetricSet {
         this,
         (metrics) -> {
           updateCompactionTaskInfo();
+          return finishInPlaceCrossCompactionTaskNum.get();
+        },
+        Tag.NAME.toString(),
+        "in_place_cross");
+    metricService.createAutoGauge(
+        Metric.COMPACTION_TASK_COUNT.toString(),
+        MetricLevel.IMPORTANT,
+        this,
+        (metrics) -> {
+          updateCompactionTaskInfo();
           return finishInsertionCompactionTaskNum.get();
         },
         Tag.NAME.toString(),
@@ -495,12 +540,24 @@ public class CompactionMetrics implements IMetricSet {
     metricService.remove(
         MetricType.TIMER, Metric.COST_TASK.toString(), Tag.NAME.toString(), "cross_compaction");
     metricService.remove(
+        MetricType.TIMER,
+        Metric.COST_TASK.toString(),
+        Tag.NAME.toString(),
+        "in_place_cross_compaction");
+    metricService.remove(
         MetricType.TIMER, Metric.COST_TASK.toString(), Tag.NAME.toString(), "insertion_compaction");
     metricService.remove(
         MetricType.AUTO_GAUGE,
         Metric.QUEUE.toString(),
         Tag.NAME.toString(),
         "compaction_cross",
+        Tag.STATUS.toString(),
+        "waiting");
+    metricService.remove(
+        MetricType.AUTO_GAUGE,
+        Metric.QUEUE.toString(),
+        Tag.NAME.toString(),
+        "compaction_in_place_cross",
         Tag.STATUS.toString(),
         "waiting");
     metricService.remove(
@@ -529,6 +586,13 @@ public class CompactionMetrics implements IMetricSet {
         Metric.QUEUE.toString(),
         Tag.NAME.toString(),
         "compaction_cross",
+        Tag.STATUS.toString(),
+        "running");
+    metricService.remove(
+        MetricType.AUTO_GAUGE,
+        Metric.QUEUE.toString(),
+        Tag.NAME.toString(),
+        "compaction_in_place_cross",
         Tag.STATUS.toString(),
         "running");
     metricService.remove(
@@ -571,6 +635,11 @@ public class CompactionMetrics implements IMetricSet {
         MetricType.AUTO_GAUGE,
         Metric.COMPACTION_TASK_COUNT.toString(),
         Tag.NAME.toString(),
+        "in_place_cross");
+    metricService.remove(
+        MetricType.AUTO_GAUGE,
+        Metric.COMPACTION_TASK_COUNT.toString(),
+        Tag.NAME.toString(),
         "insertion");
   }
 
@@ -590,6 +659,7 @@ public class CompactionMetrics implements IMetricSet {
       case INNER_UNSEQ:
         unseqInnerSpaceCompactionTaskMemory.update(memory);
         break;
+      case IN_PLACE_CROSS:
       case CROSS:
         crossSpaceCompactionTaskMemory.update(memory);
         break;
@@ -688,7 +758,9 @@ public class CompactionMetrics implements IMetricSet {
   // region compaction task selection
   private Gauge seqInnerSpaceCompactionTaskSelectedNum = DoNothingMetricManager.DO_NOTHING_GAUGE;
   private Gauge unseqInnerSpaceCompactionTaskSelectedNum = DoNothingMetricManager.DO_NOTHING_GAUGE;
-  private Gauge crossInnerSpaceCompactionTaskSelectedNum = DoNothingMetricManager.DO_NOTHING_GAUGE;
+  private Gauge crossSpaceCompactionTaskSelectedNum = DoNothingMetricManager.DO_NOTHING_GAUGE;
+  private Gauge inPlaceCrossSpaceCompactionTaskSelectedNum =
+      DoNothingMetricManager.DO_NOTHING_GAUGE;
   private Gauge insertionCrossSpaceCompactionTaskSelectedNum =
       DoNothingMetricManager.DO_NOTHING_GAUGE;
 
@@ -712,7 +784,9 @@ public class CompactionMetrics implements IMetricSet {
     seqInnerSpaceCompactionTaskSelectedNum.set(summary.getSubmitSeqInnerSpaceCompactionTaskNum());
     unseqInnerSpaceCompactionTaskSelectedNum.set(
         summary.getSubmitUnseqInnerSpaceCompactionTaskNum());
-    crossInnerSpaceCompactionTaskSelectedNum.set(summary.getSubmitCrossSpaceCompactionTaskNum());
+    crossSpaceCompactionTaskSelectedNum.set(summary.getSubmitCrossSpaceCompactionTaskNum());
+    inPlaceCrossSpaceCompactionTaskSelectedNum.set(
+        summary.getSubmitInPlaceCrossSpaceCompactionTaskNum());
     insertionCrossSpaceCompactionTaskSelectedNum.set(
         summary.getSubmitInsertionCrossSpaceCompactionTaskNum());
   }
@@ -726,6 +800,7 @@ public class CompactionMetrics implements IMetricSet {
         unseqSpaceCompactionTaskSelectionTimeCost.update(time);
         break;
       case CROSS:
+      case IN_PLACE_CROSS:
         crossSpaceCompactionTaskSelectionTimeCost.update(time);
         break;
       case INSERTION:
@@ -746,6 +821,7 @@ public class CompactionMetrics implements IMetricSet {
         unseqInnerSpaceCompactionTaskSelectedFileNum.update(selectedFileNum);
         break;
       case CROSS:
+      case IN_PLACE_CROSS:
         crossSpaceCompactionTaskSelectedFileNum.update(selectedFileNum);
         break;
       case INSERTION:
@@ -767,12 +843,18 @@ public class CompactionMetrics implements IMetricSet {
             MetricLevel.IMPORTANT,
             Tag.NAME.toString(),
             "unseq");
-    crossInnerSpaceCompactionTaskSelectedNum =
+    crossSpaceCompactionTaskSelectedNum =
         metricService.getOrCreateGauge(
             Metric.COMPACTION_TASK_SELECTION.toString(),
             MetricLevel.IMPORTANT,
             Tag.NAME.toString(),
             "cross");
+    inPlaceCrossSpaceCompactionTaskSelectedNum =
+        metricService.getOrCreateGauge(
+            Metric.COMPACTION_TASK_SELECTION.toString(),
+            MetricLevel.IMPORTANT,
+            Tag.NAME.toString(),
+            "in_place_cross");
     insertionCrossSpaceCompactionTaskSelectedNum =
         metricService.getOrCreateGauge(
             Metric.COMPACTION_TASK_SELECTION.toString(),
@@ -836,6 +918,11 @@ public class CompactionMetrics implements IMetricSet {
         Metric.COMPACTION_TASK_SELECTION.toString(),
         Tag.NAME.toString(),
         "cross");
+    metricService.remove(
+        MetricType.GAUGE,
+        Metric.COMPACTION_TASK_SELECTION.toString(),
+        Tag.NAME.toString(),
+        "in_place_cross");
     metricService.remove(
         MetricType.GAUGE,
         Metric.COMPACTION_TASK_SELECTION.toString(),
@@ -918,6 +1005,10 @@ public class CompactionMetrics implements IMetricSet {
         compactionTaskStatisticMap
             .getOrDefault(CompactionTaskType.CROSS, Collections.emptyMap())
             .getOrDefault(CompactionTaskStatus.WAITING, 0));
+    this.waitingInPlaceCrossCompactionTaskNum.set(
+        compactionTaskStatisticMap
+            .getOrDefault(CompactionTaskType.IN_PLACE_CROSS, Collections.emptyMap())
+            .getOrDefault(CompactionTaskStatus.WAITING, 0));
     this.waitingInsertionCompactionTaskNum.set(
         compactionTaskStatisticMap
             .getOrDefault(CompactionTaskType.INSERTION, Collections.emptyMap())
@@ -933,6 +1024,10 @@ public class CompactionMetrics implements IMetricSet {
     this.runningCrossCompactionTaskNum.set(
         compactionTaskStatisticMap
             .getOrDefault(CompactionTaskType.CROSS, Collections.emptyMap())
+            .getOrDefault(CompactionTaskStatus.RUNNING, 0));
+    this.runningInPlaceCrossCompactionTaskNum.set(
+        compactionTaskStatisticMap
+            .getOrDefault(CompactionTaskType.IN_PLACE_CROSS, Collections.emptyMap())
             .getOrDefault(CompactionTaskStatus.RUNNING, 0));
     this.runningInsertionCompactionTaskNum.set(
         compactionTaskStatisticMap

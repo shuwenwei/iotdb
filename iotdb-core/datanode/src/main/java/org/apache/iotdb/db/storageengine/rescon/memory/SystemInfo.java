@@ -250,6 +250,7 @@ public class SystemInfo {
         unseqInnerSpaceCompactionMemoryCost.addAndGet(memoryCost);
         break;
       case CROSS:
+      case IN_PLACE_CROSS:
         crossSpaceCompactionMemoryCost.addAndGet(memoryCost);
         break;
       default:
@@ -271,6 +272,7 @@ public class SystemInfo {
         unseqInnerSpaceCompactionMemoryCost.addAndGet(-compactionMemoryCost);
         break;
       case CROSS:
+      case IN_PLACE_CROSS:
         crossSpaceCompactionMemoryCost.addAndGet(-compactionMemoryCost);
         break;
       default:

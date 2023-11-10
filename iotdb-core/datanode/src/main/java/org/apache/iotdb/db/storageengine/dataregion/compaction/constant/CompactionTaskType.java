@@ -23,5 +23,6 @@ public enum CompactionTaskType {
   INNER_SEQ,
   INNER_UNSEQ,
   CROSS,
-  INSERTION
+  INSERTION,
+  IN_PLACE_CROSS
 }
