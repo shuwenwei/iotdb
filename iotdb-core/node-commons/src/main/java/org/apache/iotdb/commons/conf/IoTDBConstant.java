@@ -272,12 +272,6 @@ public class IoTDBConstant {
   // in place cross space compaction temp metadata file
   public static final String IN_PLACE_COMPACTION_TEMP_METADATA_FILE_SUFFIX = ".tail";
 
-  // cross space compaction of previous version (<0.13)
-  public static final String CROSS_COMPACTION_TMP_FILE_SUFFIX_FROM_OLD = ".merge";
-
-  // compaction mods of previous version (<0.13)
-  public static final String COMPACTION_MODIFICATION_FILE_NAME_FROM_OLD = "merge.mods";
-
   public static final String SETTLE_SUFFIX = ".settle";
   public static final String MODS_SETTLE_FILE_SUFFIX = ".mods.settle";
   public static final String BLANK = "";
