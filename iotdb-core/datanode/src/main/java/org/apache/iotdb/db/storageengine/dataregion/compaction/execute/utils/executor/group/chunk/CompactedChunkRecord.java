@@ -1,0 +1,68 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk;
+
+import org.apache.iotdb.tsfile.read.common.TimeRange;
+
+import java.util.List;
+
+public class CompactedChunkRecord {
+  private final TimeRange timeRange;
+  private List<CompactedPageRecord> pageRecords;
+  private final boolean isCompactedByDirectlyFlush;
+
+  public CompactedChunkRecord(List<CompactedPageRecord> pageRecords) {
+    this.timeRange =
+        new TimeRange(
+            pageRecords.get(0).getTimeRange().getMin(),
+            pageRecords.get(pageRecords.size() - 1).getTimeRange().getMax());
+    this.pageRecords = pageRecords;
+    this.isCompactedByDirectlyFlush = false;
+  }
+
+  public CompactedChunkRecord(long startTime, long endTime) {
+    this.timeRange = new TimeRange(startTime, endTime);
+    this.isCompactedByDirectlyFlush = true;
+  }
+
+  public TimeRange getTimeRange() {
+    return timeRange;
+  }
+
+  public List<CompactedPageRecord> getPageRecords() {
+    return pageRecords;
+  }
+
+  public boolean isCompactedByDirectlyFlush() {
+    return isCompactedByDirectlyFlush;
+  }
+
+  @Override
+  public String toString() {
+    return "CompactedChunkRecord{"
+        + "timeRange="
+        + timeRange
+        + ", pageRecords="
+        + pageRecords
+        + ", isCompactedByDirectlyFlush="
+        + isCompactedByDirectlyFlush
+        + '}';
+  }
+}
