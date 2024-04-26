@@ -71,7 +71,15 @@ public class CompactionTsFileInput implements TsFileInput {
 
   @Override
   public int read(ByteBuffer dst) throws IOException {
-    int readSize = tsFileInput.read(dst);
+    int readSize = -1;
+    try {
+      readSize = tsFileInput.read(dst);
+    } catch (IOException e) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new StopReadTsFileByInterruptException();
+      }
+      throw e;
+    }
     if (Thread.currentThread().isInterrupted()) {
       throw new StopReadTsFileByInterruptException();
     }
@@ -80,7 +88,15 @@ public class CompactionTsFileInput implements TsFileInput {
 
   @Override
   public int read(ByteBuffer dst, long position) throws IOException {
-    int readSize = tsFileInput.read(dst, position);
+    int readSize = -1;
+    try {
+      readSize = tsFileInput.read(dst, position);
+    } catch (IOException e) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new StopReadTsFileByInterruptException();
+      }
+      throw e;
+    }
     if (Thread.currentThread().isInterrupted()) {
       throw new StopReadTsFileByInterruptException();
     }

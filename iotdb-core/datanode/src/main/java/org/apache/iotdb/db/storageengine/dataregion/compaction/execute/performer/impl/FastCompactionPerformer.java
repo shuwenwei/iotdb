@@ -242,6 +242,10 @@ public class FastCompactionPerformer
     for (int i = 0; i < subTaskNums; i++) {
       try {
         futures.get(i).get();
+        if (futures.get(i).isCancelled() || taskSummaryList.get(i).isCancel()) {
+          Thread.currentThread().interrupt();
+          return;
+        }
         subTaskSummary.increase(taskSummaryList.get(i));
       } catch (ExecutionException e) {
         if (e.getCause() instanceof CompactionLastTimeCheckFailedException) {

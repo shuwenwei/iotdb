@@ -27,6 +27,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.wri
 import org.apache.iotdb.db.storageengine.dataregion.modification.Modification;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 
+import org.apache.tsfile.exception.StopReadTsFileByInterruptException;
 import org.apache.tsfile.exception.write.PageException;
 import org.apache.tsfile.file.metadata.IDeviceID;
 import org.apache.tsfile.read.TsFileSequenceReader;
@@ -127,9 +128,17 @@ public class FastCompactionPerformerSubTask implements Callable<Void> {
               deviceId,
               subTaskId,
               summary);
-      for (String measurement : measurements) {
-        seriesCompactionExecutor.setNewMeasurement(timeseriesMetadataOffsetMap.get(measurement));
-        seriesCompactionExecutor.execute();
+      try {
+        for (String measurement : measurements) {
+          if (Thread.currentThread().isInterrupted()) {
+            summary.cancel();
+            break;
+          }
+          seriesCompactionExecutor.setNewMeasurement(timeseriesMetadataOffsetMap.get(measurement));
+          seriesCompactionExecutor.execute();
+        }
+      } catch (StopReadTsFileByInterruptException e) {
+        summary.cancel();
       }
     } else {
       AlignedSeriesCompactionExecutor seriesCompactionExecutor =
