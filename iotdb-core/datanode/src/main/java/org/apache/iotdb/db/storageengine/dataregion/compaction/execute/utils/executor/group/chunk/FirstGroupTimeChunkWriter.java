@@ -47,13 +47,13 @@ public class FirstGroupTimeChunkWriter extends TimeChunkWriter {
   }
 
   @Override
-  public void sealCurrentPage() {
+  public void writePageToPageBuffer() {
     TimePageWriter pageWriter = getPageWriter();
     if (pageWriter != null && pageWriter.getPointNumber() > 0) {
       TimeStatistics statistics = pageWriter.getStatistics();
       pageTimeRanges.add(
           new CompactedPageRecord(statistics.getStartTime(), statistics.getEndTime(), false));
-      writePageToPageBuffer();
+      super.writePageToPageBuffer();
     }
   }
 

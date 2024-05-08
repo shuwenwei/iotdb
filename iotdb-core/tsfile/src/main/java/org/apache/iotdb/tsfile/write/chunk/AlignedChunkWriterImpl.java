@@ -337,8 +337,11 @@ public class AlignedChunkWriterImpl implements IChunkWriter {
   }
 
   protected void writePageToPageBuffer() {
+    long startTime = timeChunkWriter.getPageWriter().getStatistics().getStartTime();
+    long endTime = timeChunkWriter.getPageWriter().getStatistics().getEndTime();
     timeChunkWriter.writePageToPageBuffer();
     for (ValueChunkWriter valueChunkWriter : valueChunkWriterList) {
+      System.out.println(valueChunkWriter.getMeasurementId() + " " + startTime + " " + endTime);
       valueChunkWriter.writePageToPageBuffer();
     }
   }

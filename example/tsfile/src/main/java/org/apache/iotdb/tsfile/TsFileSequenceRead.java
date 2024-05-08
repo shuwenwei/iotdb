@@ -57,7 +57,7 @@ public class TsFileSequenceRead {
   }) // Suppress high Cognitive Complexity and Standard outputs warning
   public static void main(String[] args) throws IOException {
     String filename =
-        "/Users/shuww/IdeaProjects/timechodb/iotdb-core/datanode/target/data/sequence/root.testsg/0/0/0-18-1-0.tsfile";
+        "/Users/shuww/IdeaProjects/timechodb/iotdb-core/datanode/target/data/sequence/root.testsg/0/0/0-0-1-0.tsfile";
     if (args.length >= 1) {
       filename = args[0];
     }
@@ -145,6 +145,9 @@ public class TsFileSequenceRead {
                   pointNum++;
                   int idx = pointNum - 1;
                   if (((bitmap[idx / 8] & 0xFF) & (MASK >>> (idx % 8))) == 0) {
+                    if (printDetail) {
+                      System.out.println("\t\t\tvalue: " + null);
+                    }
                     continue;
                   }
                   Object value;
@@ -174,6 +177,7 @@ public class TsFileSequenceRead {
                     System.out.println("\t\t\tvalue: " + value);
                   }
                 }
+                pageData.flip();
                 if (pointNum == 0) {
                   System.out.println("\t\t-- Empty Page ");
                 } else {
