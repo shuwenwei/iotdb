@@ -36,7 +36,6 @@ import org.apache.iotdb.tsfile.write.schema.IMeasurementSchema;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -94,17 +93,27 @@ public class ColumnGroupAlignedSeriesCompactionExecutor
     return executor.getCompactedChunkRecords();
   }
 
-  private void compactLeftColumnGroups(List<CompactedChunkRecord> compactedChunkRecords) throws PageException, IOException {
+  private void compactLeftColumnGroups(List<CompactedChunkRecord> compactedChunkRecords)
+      throws PageException, IOException {
     while (compactedMeasurements.size() < schemaList.size()) {
       List<IMeasurementSchema> selectedColumnGroup = selectColumnGroupToCompact();
       LinkedList<Pair<TsFileSequenceReader, List<AlignedChunkMetadata>>>
           groupReaderAndChunkMetadataList =
-          filterAlignedChunkMetadataList(
-              readerAndChunkMetadataList,
-              selectedColumnGroup.stream()
-                  .map(IMeasurementSchema::getMeasurementId)
-                  .collect(Collectors.toList()));
-      NonFirstAlignedSeriesGroupCompactionExecutor executor = new NonFirstAlignedSeriesGroupCompactionExecutor(device, targetResource, groupReaderAndChunkMetadataList, writer, summary, timeSchema, selectedColumnGroup, compactedChunkRecords);
+              filterAlignedChunkMetadataList(
+                  readerAndChunkMetadataList,
+                  selectedColumnGroup.stream()
+                      .map(IMeasurementSchema::getMeasurementId)
+                      .collect(Collectors.toList()));
+      NonFirstAlignedSeriesGroupCompactionExecutor executor =
+          new NonFirstAlignedSeriesGroupCompactionExecutor(
+              device,
+              targetResource,
+              groupReaderAndChunkMetadataList,
+              writer,
+              summary,
+              timeSchema,
+              selectedColumnGroup,
+              compactedChunkRecords);
       executor.execute();
     }
   }
@@ -166,7 +175,8 @@ public class ColumnGroupAlignedSeriesCompactionExecutor
 
   private AlignedChunkMetadata filterAlignedChunkMetadata(
       AlignedChunkMetadata alignedChunkMetadata, List<String> selectedMeasurements) {
-    List<IChunkMetadata> valueChunkMetadataList = Arrays.asList(new IChunkMetadata[selectedMeasurements.size()]);
+    List<IChunkMetadata> valueChunkMetadataList =
+        Arrays.asList(new IChunkMetadata[selectedMeasurements.size()]);
 
     Map<String, Integer> measurementIndex = new HashMap<>();
     for (int i = 0; i < selectedMeasurements.size(); i++) {
@@ -175,7 +185,8 @@ public class ColumnGroupAlignedSeriesCompactionExecutor
 
     for (IChunkMetadata chunkMetadata : alignedChunkMetadata.getValueChunkMetadataList()) {
       if (measurementIndex.containsKey(chunkMetadata.getMeasurementUid())) {
-        valueChunkMetadataList.set(measurementIndex.get(chunkMetadata.getMeasurementUid()), chunkMetadata);
+        valueChunkMetadataList.set(
+            measurementIndex.get(chunkMetadata.getMeasurementUid()), chunkMetadata);
       }
     }
     return new AlignedChunkMetadata(

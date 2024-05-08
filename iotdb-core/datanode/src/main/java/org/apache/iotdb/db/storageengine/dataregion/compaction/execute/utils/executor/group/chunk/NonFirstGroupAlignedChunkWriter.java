@@ -35,7 +35,10 @@ public class NonFirstGroupAlignedChunkWriter extends AlignedChunkWriterImpl {
   private int currentPage = 0;
   private CompactedChunkRecord compactedChunkRecord;
 
-  public NonFirstGroupAlignedChunkWriter(IMeasurementSchema timeSchema, List<IMeasurementSchema> valueSchemaList, CompactedChunkRecord compactedChunkRecord) {
+  public NonFirstGroupAlignedChunkWriter(
+      IMeasurementSchema timeSchema,
+      List<IMeasurementSchema> valueSchemaList,
+      CompactedChunkRecord compactedChunkRecord) {
     timeChunkWriter =
         new FirstGroupTimeChunkWriter(
             timeSchema.getMeasurementId(),
@@ -61,7 +64,8 @@ public class NonFirstGroupAlignedChunkWriter extends AlignedChunkWriterImpl {
   @Override
   protected boolean checkPageSizeAndMayOpenANewPage() {
     long endTime = timeChunkWriter.getPageWriter().getStatistics().getEndTime();
-    return endTime == compactedChunkRecord.getPageRecords().get(currentPage).getTimeRange().getMax();
+    return endTime
+        == compactedChunkRecord.getPageRecords().get(currentPage).getTimeRange().getMax();
   }
 
   @Override
@@ -71,7 +75,8 @@ public class NonFirstGroupAlignedChunkWriter extends AlignedChunkWriterImpl {
   }
 
   @Override
-  public void writePageHeaderAndDataIntoTimeBuff(ByteBuffer data, PageHeader header) throws PageException {
+  public void writePageHeaderAndDataIntoTimeBuff(ByteBuffer data, PageHeader header)
+      throws PageException {
     super.writePageHeaderAndDataIntoTimeBuff(data, header);
     currentPage++;
   }
@@ -84,7 +89,8 @@ public class NonFirstGroupAlignedChunkWriter extends AlignedChunkWriterImpl {
   }
 
   @Override
-  public boolean checkIsChunkSizeOverThreshold(long size, long pointNum, boolean returnTrueIfChunkEmpty) {
+  public boolean checkIsChunkSizeOverThreshold(
+      long size, long pointNum, boolean returnTrueIfChunkEmpty) {
     return currentPage >= compactedChunkRecord.getPageRecords().size();
   }
 

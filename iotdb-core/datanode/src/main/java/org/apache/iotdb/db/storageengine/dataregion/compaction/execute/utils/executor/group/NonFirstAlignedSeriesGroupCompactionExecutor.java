@@ -20,7 +20,9 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group;
 
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CompactionTaskSummary;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.ModifiedStatus;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.CompactedChunkRecord;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.GroupCompactionAlignedPagePointReader;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.NonFirstGroupAlignedChunkWriter;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.readchunk.ReadChunkAlignedSeriesCompactionExecutor;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.readchunk.loader.ChunkLoader;
@@ -31,15 +33,17 @@ import org.apache.iotdb.tsfile.file.metadata.AlignedChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.IDeviceID;
 import org.apache.iotdb.tsfile.file.metadata.statistics.Statistics;
 import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
+import org.apache.iotdb.tsfile.read.reader.IPointReader;
+import org.apache.iotdb.tsfile.read.reader.page.AlignedPageReader;
 import org.apache.iotdb.tsfile.utils.Pair;
-import org.apache.iotdb.tsfile.write.chunk.AlignedChunkWriterImpl;
 import org.apache.iotdb.tsfile.write.schema.IMeasurementSchema;
 
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
-public class NonFirstAlignedSeriesGroupCompactionExecutor extends ReadChunkAlignedSeriesCompactionExecutor {
+public class NonFirstAlignedSeriesGroupCompactionExecutor
+    extends ReadChunkAlignedSeriesCompactionExecutor {
   private final List<CompactedChunkRecord> compactionPlan;
   private int currentCompactChunk;
 
@@ -62,7 +66,8 @@ public class NonFirstAlignedSeriesGroupCompactionExecutor extends ReadChunkAlign
         valueSchemaList);
     this.compactionPlan = compactionPlan;
     this.flushPolicy = new ColumnGroupFlushDataBlockPolicy();
-    this.chunkWriter = new NonFirstGroupAlignedChunkWriter(timeSchema, schemaList, compactionPlan.get(0));
+    this.chunkWriter =
+        new NonFirstGroupAlignedChunkWriter(timeSchema, schemaList, compactionPlan.get(0));
   }
 
   @Override
@@ -79,11 +84,11 @@ public class NonFirstAlignedSeriesGroupCompactionExecutor extends ReadChunkAlign
   }
 
   @Override
-  protected void compactAlignedChunkByFlush(ChunkLoader timeChunk, List<ChunkLoader> valueChunks) throws IOException {
+  protected void compactAlignedChunkByFlush(ChunkLoader timeChunk, List<ChunkLoader> valueChunks)
+      throws IOException {
     writer.markStartingWritingAligned();
     checkAndUpdatePreviousTimestamp(timeChunk.getChunkMetadata().getStartTime());
     checkAndUpdatePreviousTimestamp(timeChunk.getChunkMetadata().getEndTime());
-//    writer.writeChunk(timeChunk.getChunk(), timeChunk.getChunkMetadata());
     timeChunk.clear();
     int nonEmptyChunkNum = 0;
     for (int i = 0; i < valueChunks.size(); i++) {
@@ -107,6 +112,12 @@ public class NonFirstAlignedSeriesGroupCompactionExecutor extends ReadChunkAlign
     currentCompactChunk++;
   }
 
+  @Override
+  protected IPointReader getPointReader(AlignedPageReader alignedPageReader) throws IOException {
+    return new GroupCompactionAlignedPagePointReader(
+        alignedPageReader.getTimePageReader(), alignedPageReader.getValuePageReaderList());
+  }
+
   private class ColumnGroupFlushDataBlockPolicy extends FlushDataBlockPolicy {
 
     public ColumnGroupFlushDataBlockPolicy() {
@@ -114,7 +125,8 @@ public class NonFirstAlignedSeriesGroupCompactionExecutor extends ReadChunkAlign
     }
 
     @Override
-    public boolean canCompactCurrentChunkByDirectlyFlush(ChunkLoader timeChunk, List<ChunkLoader> valueChunks) throws IOException {
+    public boolean canCompactCurrentChunkByDirectlyFlush(
+        ChunkLoader timeChunk, List<ChunkLoader> valueChunks) throws IOException {
       return compactionPlan.get(currentCompactChunk).isCompactedByDirectlyFlush();
     }
 
@@ -124,9 +136,27 @@ public class NonFirstAlignedSeriesGroupCompactionExecutor extends ReadChunkAlign
     }
 
     @Override
-    protected boolean canCompactCurrentPageByDirectlyFlush(PageLoader timePage, List<PageLoader> valuePages) {
+    protected boolean canCompactCurrentPageByDirectlyFlush(
+        PageLoader timePage, List<PageLoader> valuePages) {
       int currentPage = ((NonFirstGroupAlignedChunkWriter) chunkWriter).getCurrentPage();
-      return compactionPlan.get(currentCompactChunk).getPageRecords().get(currentPage).isCompactedByDirectlyFlush();
+      for (int i = 0; i < valuePages.size(); i++) {
+        PageLoader currentValuePage = valuePages.get(i);
+        if (currentValuePage.isEmpty()) {
+          continue;
+        }
+        if (currentValuePage.getCompressionType() != schemaList.get(i).getCompressor()
+            || currentValuePage.getEncoding() != schemaList.get(i).getEncodingType()) {
+          return false;
+        }
+        if (currentValuePage.getModifiedStatus() == ModifiedStatus.PARTIAL_DELETED) {
+          return false;
+        }
+      }
+      return compactionPlan
+          .get(currentCompactChunk)
+          .getPageRecords()
+          .get(currentPage)
+          .isCompactedByDirectlyFlush();
     }
   }
 }

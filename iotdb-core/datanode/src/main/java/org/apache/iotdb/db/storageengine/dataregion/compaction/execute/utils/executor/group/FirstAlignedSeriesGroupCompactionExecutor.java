@@ -22,6 +22,7 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.ex
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.CompactedChunkRecord;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.FirstGroupAlignedChunkWriter;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.GroupCompactionAlignedPagePointReader;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.readchunk.ReadChunkAlignedSeriesCompactionExecutor;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.readchunk.loader.ChunkLoader;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.io.CompactionTsFileWriter;
@@ -30,6 +31,8 @@ import org.apache.iotdb.tsfile.file.metadata.AlignedChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.ChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.IDeviceID;
 import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
+import org.apache.iotdb.tsfile.read.reader.IPointReader;
+import org.apache.iotdb.tsfile.read.reader.page.AlignedPageReader;
 import org.apache.iotdb.tsfile.utils.Pair;
 import org.apache.iotdb.tsfile.write.chunk.AlignedChunkWriterImpl;
 import org.apache.iotdb.tsfile.write.schema.IMeasurementSchema;
@@ -89,5 +92,11 @@ public class FirstAlignedSeriesGroupCompactionExecutor
 
   public List<CompactedChunkRecord> getCompactedChunkRecords() {
     return compactedChunkRecords;
+  }
+
+  @Override
+  protected IPointReader getPointReader(AlignedPageReader alignedPageReader) throws IOException {
+    return new GroupCompactionAlignedPagePointReader(
+        alignedPageReader.getTimePageReader(), alignedPageReader.getValuePageReaderList());
   }
 }
