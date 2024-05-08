@@ -22,6 +22,7 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.ex
 import org.apache.iotdb.tsfile.exception.write.PageException;
 import org.apache.iotdb.tsfile.file.header.PageHeader;
 import org.apache.iotdb.tsfile.write.chunk.AlignedChunkWriterImpl;
+import org.apache.iotdb.tsfile.write.chunk.TimeChunkWriter;
 import org.apache.iotdb.tsfile.write.chunk.ValueChunkWriter;
 import org.apache.iotdb.tsfile.write.schema.IMeasurementSchema;
 import org.apache.iotdb.tsfile.write.writer.TsFileIOWriter;
@@ -40,7 +41,7 @@ public class NonFirstGroupAlignedChunkWriter extends AlignedChunkWriterImpl {
       List<IMeasurementSchema> valueSchemaList,
       CompactedChunkRecord compactedChunkRecord) {
     timeChunkWriter =
-        new FirstGroupTimeChunkWriter(
+        new TimeChunkWriter(
             timeSchema.getMeasurementId(),
             timeSchema.getCompressor(),
             timeSchema.getEncodingType(),
