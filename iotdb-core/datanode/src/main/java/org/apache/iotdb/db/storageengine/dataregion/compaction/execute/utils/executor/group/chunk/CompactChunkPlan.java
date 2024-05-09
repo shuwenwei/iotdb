@@ -23,12 +23,12 @@ import org.apache.iotdb.tsfile.read.common.TimeRange;
 
 import java.util.List;
 
-public class CompactedChunkRecord {
+public class CompactChunkPlan {
   private final TimeRange timeRange;
-  private List<CompactedPageRecord> pageRecords;
+  private List<CompactPagePlan> pageRecords;
   private final boolean isCompactedByDirectlyFlush;
 
-  public CompactedChunkRecord(List<CompactedPageRecord> pageRecords) {
+  public CompactChunkPlan(List<CompactPagePlan> pageRecords) {
     this.timeRange =
         new TimeRange(
             pageRecords.get(0).getTimeRange().getMin(),
@@ -37,7 +37,7 @@ public class CompactedChunkRecord {
     this.isCompactedByDirectlyFlush = false;
   }
 
-  public CompactedChunkRecord(long startTime, long endTime) {
+  public CompactChunkPlan(long startTime, long endTime) {
     this.timeRange = new TimeRange(startTime, endTime);
     this.isCompactedByDirectlyFlush = true;
   }
@@ -46,7 +46,7 @@ public class CompactedChunkRecord {
     return timeRange;
   }
 
-  public List<CompactedPageRecord> getPageRecords() {
+  public List<CompactPagePlan> getPageRecords() {
     return pageRecords;
   }
 

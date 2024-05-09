@@ -21,7 +21,7 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.ex
 
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.ModifiedStatus;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.CompactedChunkRecord;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.CompactChunkPlan;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.FirstGroupAlignedChunkWriter;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.GroupCompactionAlignedPagePointReader;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.NonFirstGroupAlignedChunkWriter;
@@ -74,11 +74,11 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
 
   @Override
   public void execute() throws IOException, PageException {
-    List<CompactedChunkRecord> compactedChunkRecords = compactFirstColumnGroup();
-    compactLeftColumnGroups(compactedChunkRecords);
+    List<CompactChunkPlan> compactChunkPlans = compactFirstColumnGroup();
+    compactLeftColumnGroups(compactChunkPlans);
   }
 
-  private List<CompactedChunkRecord> compactFirstColumnGroup() throws IOException, PageException {
+  private List<CompactChunkPlan> compactFirstColumnGroup() throws IOException, PageException {
     List<IMeasurementSchema> firstGroupMeasurements = selectColumnGroupToCompact();
 
     LinkedList<Pair<TsFileSequenceReader, List<AlignedChunkMetadata>>>
@@ -98,13 +98,13 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
             timeSchema,
             firstGroupMeasurements);
     executor.execute();
-    for (CompactedChunkRecord compactedChunkRecord : executor.getCompactedChunkRecords()) {
-      System.out.println(compactedChunkRecord);
+    for (CompactChunkPlan compactChunkPlan : executor.getCompactedChunkRecords()) {
+      System.out.println(compactChunkPlan);
     }
     return executor.getCompactedChunkRecords();
   }
 
-  private void compactLeftColumnGroups(List<CompactedChunkRecord> compactedChunkRecords)
+  private void compactLeftColumnGroups(List<CompactChunkPlan> compactChunkPlans)
       throws PageException, IOException {
     while (compactedMeasurements.size() < schemaList.size()) {
       List<IMeasurementSchema> selectedColumnGroup = selectColumnGroupToCompact();
@@ -124,7 +124,7 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
               summary,
               timeSchema,
               selectedColumnGroup,
-              compactedChunkRecords);
+              compactChunkPlans);
       executor.execute();
     }
   }
@@ -195,6 +195,9 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
     }
 
     for (IChunkMetadata chunkMetadata : alignedChunkMetadata.getValueChunkMetadataList()) {
+      if (chunkMetadata == null) {
+        continue;
+      }
       if (measurementIndex.containsKey(chunkMetadata.getMeasurementUid())) {
         valueChunkMetadataList.set(
             measurementIndex.get(chunkMetadata.getMeasurementUid()), chunkMetadata);
@@ -207,7 +210,7 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
   public static class FirstAlignedSeriesGroupCompactionExecutor
       extends ReadChunkAlignedSeriesCompactionExecutor {
 
-    private final List<CompactedChunkRecord> compactedChunkRecords = new ArrayList<>();
+    private final List<CompactChunkPlan> compactChunkPlans = new ArrayList<>();
 
     public FirstAlignedSeriesGroupCompactionExecutor(
         IDeviceID device,
@@ -237,9 +240,8 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
     protected void compactAlignedChunkByFlush(ChunkLoader timeChunk, List<ChunkLoader> valueChunks)
         throws IOException {
       ChunkMetadata timeChunkMetadata = timeChunk.getChunkMetadata();
-      compactedChunkRecords.add(
-          new CompactedChunkRecord(
-              timeChunkMetadata.getStartTime(), timeChunkMetadata.getEndTime()));
+      compactChunkPlans.add(
+          new CompactChunkPlan(timeChunkMetadata.getStartTime(), timeChunkMetadata.getEndTime()));
       super.compactAlignedChunkByFlush(timeChunk, valueChunks);
     }
 
@@ -247,15 +249,15 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
     protected void flushCurrentChunkWriter() throws IOException {
       chunkWriter.sealCurrentPage();
       if (!chunkWriter.isEmpty()) {
-        CompactedChunkRecord compactedChunkRecord =
+        CompactChunkPlan compactChunkPlan =
             ((FirstGroupAlignedChunkWriter) chunkWriter).getCompactedChunkRecord();
-        compactedChunkRecords.add(compactedChunkRecord);
+        compactChunkPlans.add(compactChunkPlan);
       }
       writer.writeChunk(chunkWriter);
     }
 
-    public List<CompactedChunkRecord> getCompactedChunkRecords() {
-      return compactedChunkRecords;
+    public List<CompactChunkPlan> getCompactedChunkRecords() {
+      return compactChunkPlans;
     }
 
     @Override
@@ -267,7 +269,7 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
 
   public static class NonFirstAlignedSeriesGroupCompactionExecutor
       extends ReadChunkAlignedSeriesCompactionExecutor {
-    private final List<CompactedChunkRecord> compactionPlan;
+    private final List<CompactChunkPlan> compactionPlan;
     private int currentCompactChunk;
 
     public NonFirstAlignedSeriesGroupCompactionExecutor(
@@ -279,7 +281,7 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
         CompactionTaskSummary summary,
         IMeasurementSchema timeSchema,
         List<IMeasurementSchema> valueSchemaList,
-        List<CompactedChunkRecord> compactionPlan) {
+        List<CompactChunkPlan> compactionPlan) {
       super(
           device,
           targetResource,
@@ -302,7 +304,7 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
       super.flushCurrentChunkWriter();
       currentCompactChunk++;
       if (currentCompactChunk < compactionPlan.size()) {
-        CompactedChunkRecord chunkRecord = compactionPlan.get(currentCompactChunk);
+        CompactChunkPlan chunkRecord = compactionPlan.get(currentCompactChunk);
         this.chunkWriter = new NonFirstGroupAlignedChunkWriter(timeSchema, schemaList, chunkRecord);
       }
     }

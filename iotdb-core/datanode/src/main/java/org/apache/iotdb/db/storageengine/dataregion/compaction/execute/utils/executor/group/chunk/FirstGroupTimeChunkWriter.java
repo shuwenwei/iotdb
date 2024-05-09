@@ -36,7 +36,7 @@ import java.util.List;
 
 public class FirstGroupTimeChunkWriter extends TimeChunkWriter {
 
-  private List<CompactedPageRecord> pageTimeRanges = new ArrayList<>();
+  private List<CompactPagePlan> pageTimeRanges = new ArrayList<>();
 
   public FirstGroupTimeChunkWriter(
       String measurementId,
@@ -52,7 +52,7 @@ public class FirstGroupTimeChunkWriter extends TimeChunkWriter {
     if (pageWriter != null && pageWriter.getPointNumber() > 0) {
       TimeStatistics statistics = pageWriter.getStatistics();
       pageTimeRanges.add(
-          new CompactedPageRecord(statistics.getStartTime(), statistics.getEndTime(), false));
+          new CompactPagePlan(statistics.getStartTime(), statistics.getEndTime(), false));
       super.writePageToPageBuffer();
     }
   }
@@ -66,11 +66,11 @@ public class FirstGroupTimeChunkWriter extends TimeChunkWriter {
   @Override
   public void writePageHeaderAndDataIntoBuff(ByteBuffer data, PageHeader header)
       throws PageException {
-    pageTimeRanges.add(new CompactedPageRecord(header.getStartTime(), header.getEndTime(), true));
+    pageTimeRanges.add(new CompactPagePlan(header.getStartTime(), header.getEndTime(), true));
     super.writePageHeaderAndDataIntoBuff(data, header);
   }
 
-  public List<CompactedPageRecord> getPageTimeRanges() {
+  public List<CompactPagePlan> getPageTimeRanges() {
     return this.pageTimeRanges;
   }
 }

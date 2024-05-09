@@ -34,12 +34,12 @@ import java.util.List;
 
 public class NonFirstGroupAlignedChunkWriter extends AlignedChunkWriterImpl {
   private int currentPage = 0;
-  private CompactedChunkRecord compactedChunkRecord;
+  private CompactChunkPlan compactChunkPlan;
 
   public NonFirstGroupAlignedChunkWriter(
       IMeasurementSchema timeSchema,
       List<IMeasurementSchema> valueSchemaList,
-      CompactedChunkRecord compactedChunkRecord) {
+      CompactChunkPlan compactChunkPlan) {
     timeChunkWriter =
         new TimeChunkWriter(
             timeSchema.getMeasurementId(),
@@ -59,14 +59,13 @@ public class NonFirstGroupAlignedChunkWriter extends AlignedChunkWriterImpl {
     }
     this.valueIndex = 0;
     this.remainingPointsNumber = timeChunkWriter.getRemainingPointNumberForCurrentPage();
-    this.compactedChunkRecord = compactedChunkRecord;
+    this.compactChunkPlan = compactChunkPlan;
   }
 
   @Override
   protected boolean checkPageSizeAndMayOpenANewPage() {
     long endTime = timeChunkWriter.getPageWriter().getStatistics().getEndTime();
-    return endTime
-        == compactedChunkRecord.getPageRecords().get(currentPage).getTimeRange().getMax();
+    return endTime == compactChunkPlan.getPageRecords().get(currentPage).getTimeRange().getMax();
   }
 
   @Override
@@ -92,7 +91,7 @@ public class NonFirstGroupAlignedChunkWriter extends AlignedChunkWriterImpl {
   @Override
   public boolean checkIsChunkSizeOverThreshold(
       long size, long pointNum, boolean returnTrueIfChunkEmpty) {
-    return currentPage >= compactedChunkRecord.getPageRecords().size();
+    return currentPage >= compactChunkPlan.getPageRecords().size();
   }
 
   public int getCurrentPage() {

@@ -115,8 +115,8 @@ public class FirstGroupAlignedChunkWriter extends AlignedChunkWriterImpl {
     this.remainingPointsNumber = timeChunkWriter.getRemainingPointNumberForCurrentPage();
   }
 
-  public CompactedChunkRecord getCompactedChunkRecord() {
-    return new CompactedChunkRecord(
+  public CompactChunkPlan getCompactedChunkRecord() {
+    return new CompactChunkPlan(
         ((FirstGroupTimeChunkWriter) this.getTimeChunkWriter()).getPageTimeRanges());
   }
 }

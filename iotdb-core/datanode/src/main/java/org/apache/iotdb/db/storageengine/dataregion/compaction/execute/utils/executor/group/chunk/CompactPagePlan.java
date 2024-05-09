@@ -21,11 +21,11 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.ex
 
 import org.apache.iotdb.tsfile.read.common.TimeRange;
 
-public class CompactedPageRecord {
+public class CompactPagePlan {
   private final TimeRange timeRange;
   private final boolean isCompactedByDirectlyFlush;
 
-  public CompactedPageRecord(long startTime, long endTime, boolean isCompactedByDirectlyFlush) {
+  public CompactPagePlan(long startTime, long endTime, boolean isCompactedByDirectlyFlush) {
     this.timeRange = new TimeRange(startTime, endTime);
     this.isCompactedByDirectlyFlush = isCompactedByDirectlyFlush;
   }
