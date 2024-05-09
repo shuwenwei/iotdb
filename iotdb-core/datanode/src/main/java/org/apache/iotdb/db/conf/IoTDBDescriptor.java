@@ -616,6 +616,15 @@ public class IoTDBDescriptor {
         Integer.parseInt(
             properties.getProperty(
                 "compaction_thread_count", Integer.toString(conf.getCompactionThreadCount()))));
+    int maxConcurrentAlignedSeriesInCompaction =
+        Integer.parseInt(
+            properties.getProperty(
+                "max_concurrent_aligned_series_in_compaction",
+                Integer.toString(conf.getMaxConcurrentAlignedSeriesInCompaction())));
+    conf.setMaxConcurrentAlignedSeriesInCompaction(
+        maxConcurrentAlignedSeriesInCompaction <= 0
+            ? Integer.MAX_VALUE
+            : maxConcurrentAlignedSeriesInCompaction);
     conf.setChunkMetadataSizeProportion(
         Double.parseDouble(
             properties.getProperty(

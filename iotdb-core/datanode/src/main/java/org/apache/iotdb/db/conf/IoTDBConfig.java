@@ -693,6 +693,12 @@ public class IoTDBConfig {
    */
   private int compactionThreadCount = 10;
 
+  /**
+   * How many chunk will be compact in aligned series compaction, 10 by default. Set to
+   * Integer.MAX_VALUE when less than or equal to 0.
+   */
+  private int maxConcurrentAlignedSeriesInCompaction = 10;
+
   /*
    * How many thread will be set up to perform continuous queries. When <= 0, use max(1, CPU core number / 2).
    */
@@ -1996,6 +2002,15 @@ public class IoTDBConfig {
 
   public void setCompactionThreadCount(int compactionThreadCount) {
     this.compactionThreadCount = compactionThreadCount;
+  }
+
+  public int getMaxConcurrentAlignedSeriesInCompaction() {
+    return maxConcurrentAlignedSeriesInCompaction;
+  }
+
+  public void setMaxConcurrentAlignedSeriesInCompaction(
+      int maxConcurrentAlignedSeriesInCompaction) {
+    this.maxConcurrentAlignedSeriesInCompaction = maxConcurrentAlignedSeriesInCompaction;
   }
 
   public int getContinuousQueryThreadNum() {

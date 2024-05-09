@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group;
 
+import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.ModifiedStatus;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.CompactChunkPlan;
@@ -58,7 +59,8 @@ import java.util.stream.Collectors;
 public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
     extends ReadChunkAlignedSeriesCompactionExecutor {
 
-  private int compactColumnNum = 2;
+  private final int compactColumnNum =
+      IoTDBDescriptor.getInstance().getConfig().getMaxConcurrentAlignedSeriesInCompaction();
   private Set<String> compactedMeasurements;
 
   public ColumnGroupReadChunkAlignedSeriesCompactionExecutor(
