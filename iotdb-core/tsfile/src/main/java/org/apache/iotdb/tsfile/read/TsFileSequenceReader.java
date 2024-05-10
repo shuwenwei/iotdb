@@ -1753,6 +1753,7 @@ public class TsFileSequenceReader implements AutoCloseable {
     List<long[]> timeBatch = new ArrayList<>();
     IDeviceID lastDeviceId = null;
     List<IMeasurementSchema> measurementSchemaList = new ArrayList<>();
+    Map<String, Integer> onlyOnePageChunk2TimeBatchIndex = new HashMap<>();
     try {
       while ((marker = this.readMarker()) != MetaMarker.SEPARATOR) {
         switch (marker) {
@@ -1776,14 +1777,17 @@ public class TsFileSequenceReader implements AutoCloseable {
                     chunkHeader.getCompressionType());
             measurementSchemaList.add(measurementSchema);
             dataType = chunkHeader.getDataType();
-            if (chunkHeader.getDataType() == TSDataType.VECTOR) {
-              timeBatch.clear();
-            }
+            //            if (chunkHeader.getDataType() == TSDataType.VECTOR) {
+            //              timeBatch.clear();
+            //            }
             Statistics<? extends Serializable> chunkStatistics =
                 Statistics.getStatsByType(dataType);
             int dataSize = chunkHeader.getDataSize();
 
             if (dataSize > 0) {
+              if (marker == MetaMarker.TIME_CHUNK_HEADER) {
+                timeBatch.add(null);
+              }
               if (((byte) (chunkHeader.getChunkType() & 0x3F))
                   == MetaMarker
                       .CHUNK_HEADER) { // more than one page, we could use page statistics to
@@ -1828,7 +1832,13 @@ public class TsFileSequenceReader implements AutoCloseable {
                   ValuePageReader valuePageReader =
                       new ValuePageReader(
                           pageHeader, pageData, chunkHeader.getDataType(), valueDecoder);
-                  TsPrimitiveType[] valueBatch = valuePageReader.nextValueBatch(timeBatch.get(0));
+                  int timeBatchIndex =
+                      onlyOnePageChunk2TimeBatchIndex.getOrDefault(
+                          chunkHeader.getMeasurementID(), 0);
+                  onlyOnePageChunk2TimeBatchIndex.put(
+                      chunkHeader.getMeasurementID(), timeBatchIndex + 1);
+                  TsPrimitiveType[] valueBatch =
+                      valuePageReader.nextValueBatch(timeBatch.get(timeBatchIndex));
 
                   if (valueBatch != null && valueBatch.length != 0) {
                     for (int i = 0; i < valueBatch.length; i++) {
@@ -1836,7 +1846,7 @@ public class TsFileSequenceReader implements AutoCloseable {
                       if (value == null) {
                         continue;
                       }
-                      long timeStamp = timeBatch.get(0)[i];
+                      long timeStamp = timeBatch.get(timeBatchIndex)[i];
                       switch (dataType) {
                         case INT32:
                           chunkStatistics.update(timeStamp, value.getInt());
@@ -1899,6 +1909,11 @@ public class TsFileSequenceReader implements AutoCloseable {
                 }
                 chunkHeader.increasePageNums(1);
               }
+            } else {
+              int timeBatchIndex =
+                  onlyOnePageChunk2TimeBatchIndex.getOrDefault(chunkHeader.getMeasurementID(), 0);
+              onlyOnePageChunk2TimeBatchIndex.put(
+                  chunkHeader.getMeasurementID(), timeBatchIndex + 1);
             }
             currentChunk =
                 new ChunkMetadata(measurementID, dataType, fileOffsetOfChunk, chunkStatistics);
@@ -1924,6 +1939,8 @@ public class TsFileSequenceReader implements AutoCloseable {
             chunkMetadataList = new ArrayList<>();
             ChunkGroupHeader chunkGroupHeader = this.readChunkGroupHeader();
             lastDeviceId = chunkGroupHeader.getDeviceID();
+            timeBatch.clear();
+            onlyOnePageChunk2TimeBatchIndex.clear();
             break;
           case MetaMarker.OPERATION_INDEX_RANGE:
             truncatedSize = this.position() - 1;
@@ -1942,6 +1959,8 @@ public class TsFileSequenceReader implements AutoCloseable {
             }
             readPlanIndex();
             truncatedSize = this.position();
+            timeBatch.clear();
+            onlyOnePageChunk2TimeBatchIndex.clear();
             break;
           default:
             // the disk file is corrupted, using this file may be dangerous
