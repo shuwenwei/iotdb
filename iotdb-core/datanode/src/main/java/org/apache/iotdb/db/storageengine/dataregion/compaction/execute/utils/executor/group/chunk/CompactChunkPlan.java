@@ -56,7 +56,7 @@ public class CompactChunkPlan {
 
   @Override
   public String toString() {
-    return "CompactedChunkRecord{"
+    return "CompactChunkPlan{"
         + "timeRange="
         + timeRange
         + ", pageRecords="

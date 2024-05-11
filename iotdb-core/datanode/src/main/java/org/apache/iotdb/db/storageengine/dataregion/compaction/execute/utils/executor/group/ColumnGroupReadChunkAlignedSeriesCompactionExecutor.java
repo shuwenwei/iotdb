@@ -117,9 +117,6 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
             timeSchema,
             firstGroupMeasurements);
     executor.execute();
-    for (CompactChunkPlan compactChunkPlan : executor.getCompactedChunkRecords()) {
-      System.out.println(compactChunkPlan);
-    }
     return executor.getCompactedChunkRecords();
   }
 

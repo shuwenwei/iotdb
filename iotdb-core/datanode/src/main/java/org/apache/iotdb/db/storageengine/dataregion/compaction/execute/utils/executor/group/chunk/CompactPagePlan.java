@@ -40,7 +40,7 @@ public class CompactPagePlan {
 
   @Override
   public String toString() {
-    return "CompactedPageRecord{"
+    return "CompactPagePlan{"
         + "timeRange="
         + timeRange
         + ", isCompactedByDirectlyFlush="
