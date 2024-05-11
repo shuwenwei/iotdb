@@ -58,7 +58,7 @@ public abstract class SeriesCompactionExecutor {
         throws WriteProcessException, IOException, IllegalPathException;
   }
 
-  private final FastCompactionTaskSummary summary;
+  protected final FastCompactionTaskSummary summary;
 
   // source files which are sorted by the start time of current device from old to new. Notice: If
   // the type of timeIndex is FileTimeIndex, it may contain resources in which the current device
@@ -75,7 +75,7 @@ public abstract class SeriesCompactionExecutor {
 
   protected Map<TsFileResource, TsFileSequenceReader> readerCacheMap;
 
-  private final Map<TsFileResource, List<Modification>> modificationCacheMap;
+  protected final Map<TsFileResource, List<Modification>> modificationCacheMap;
 
   private final PointPriorityReader pointPriorityReader;
 

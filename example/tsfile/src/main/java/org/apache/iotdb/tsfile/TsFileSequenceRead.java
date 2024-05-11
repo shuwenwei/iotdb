@@ -57,7 +57,7 @@ public class TsFileSequenceRead {
   }) // Suppress high Cognitive Complexity and Standard outputs warning
   public static void main(String[] args) throws IOException {
     String filename =
-        "/Users/shuww/IdeaProjects/timechodb/iotdb-core/datanode/target/data/sequence/root.testsg/0/0/0-0-1-0.tsfile";
+        "/Users/shuww/IdeaProjects/timechodb/iotdb-core/datanode/target/data/sequence/root.testsg/0/0/0-18-1-0.tsfile";
     if (args.length >= 1) {
       filename = args[0];
     }

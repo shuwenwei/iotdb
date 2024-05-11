@@ -19,13 +19,13 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group;
 
-import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.CompactionTaskSummary;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.ModifiedStatus;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.CompactChunkPlan;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.FirstGroupAlignedChunkWriter;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.GroupCompactionAlignedPagePointReader;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.chunk.NonFirstGroupAlignedChunkWriter;
+import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.util.AlignedSeriesGroupCompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.readchunk.ReadChunkAlignedSeriesCompactionExecutor;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.readchunk.loader.ChunkLoader;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.readchunk.loader.PageLoader;
@@ -36,7 +36,6 @@ import org.apache.iotdb.tsfile.file.metadata.AlignedChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.ChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.IChunkMetadata;
 import org.apache.iotdb.tsfile.file.metadata.IDeviceID;
-import org.apache.iotdb.tsfile.file.metadata.enums.TSDataType;
 import org.apache.iotdb.tsfile.file.metadata.statistics.Statistics;
 import org.apache.iotdb.tsfile.read.TsFileSequenceReader;
 import org.apache.iotdb.tsfile.read.reader.IPointReader;
@@ -59,9 +58,7 @@ import java.util.stream.Collectors;
 public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
     extends ReadChunkAlignedSeriesCompactionExecutor {
 
-  private final int compactColumnNum =
-      IoTDBDescriptor.getInstance().getConfig().getMaxConcurrentAlignedSeriesInCompaction();
-  private Set<String> compactedMeasurements;
+  private final Set<String> compactedMeasurements;
 
   public ColumnGroupReadChunkAlignedSeriesCompactionExecutor(
       IDeviceID device,
@@ -81,7 +78,9 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
   }
 
   private List<CompactChunkPlan> compactFirstColumnGroup() throws IOException, PageException {
-    List<IMeasurementSchema> firstGroupMeasurements = selectColumnGroupToCompact();
+    List<IMeasurementSchema> firstGroupMeasurements =
+        AlignedSeriesGroupCompactionUtils.selectColumnGroupToCompact(
+            schemaList, compactedMeasurements);
 
     LinkedList<Pair<TsFileSequenceReader, List<AlignedChunkMetadata>>>
         groupReaderAndChunkMetadataList =
@@ -109,7 +108,9 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
   private void compactLeftColumnGroups(List<CompactChunkPlan> compactChunkPlans)
       throws PageException, IOException {
     while (compactedMeasurements.size() < schemaList.size()) {
-      List<IMeasurementSchema> selectedColumnGroup = selectColumnGroupToCompact();
+      List<IMeasurementSchema> selectedColumnGroup =
+          AlignedSeriesGroupCompactionUtils.selectColumnGroupToCompact(
+              schemaList, compactedMeasurements);
       LinkedList<Pair<TsFileSequenceReader, List<AlignedChunkMetadata>>>
           groupReaderAndChunkMetadataList =
               filterAlignedChunkMetadataList(
@@ -129,42 +130,6 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
               compactChunkPlans);
       executor.execute();
     }
-  }
-
-  private List<IMeasurementSchema> selectColumnGroupToCompact() {
-    List<IMeasurementSchema> selectedColumnGroup = new ArrayList<>(compactColumnNum);
-    for (IMeasurementSchema schema : schemaList) {
-      if (!schema.getType().equals(TSDataType.TEXT)) {
-        continue;
-      }
-      if (compactedMeasurements.contains(schema.getMeasurementId())) {
-        continue;
-      }
-      if (!compactedMeasurements.contains(schema.getMeasurementId())
-          && schema.getType().equals(TSDataType.TEXT)) {
-        compactedMeasurements.add(schema.getMeasurementId());
-        selectedColumnGroup.add(schema);
-      }
-      selectedColumnGroup.add(schema);
-      compactedMeasurements.add(schema.getMeasurementId());
-      if (compactedMeasurements.size() == schemaList.size()) {
-        return selectedColumnGroup;
-      }
-    }
-    for (IMeasurementSchema schema : schemaList) {
-      if (compactedMeasurements.contains(schema.getMeasurementId())) {
-        continue;
-      }
-      selectedColumnGroup.add(schema);
-      compactedMeasurements.add(schema.getMeasurementId());
-      if (selectedColumnGroup.size() == compactColumnNum) {
-        break;
-      }
-      if (compactedMeasurements.size() == schemaList.size()) {
-        break;
-      }
-    }
-    return selectedColumnGroup;
   }
 
   private LinkedList<Pair<TsFileSequenceReader, List<AlignedChunkMetadata>>>

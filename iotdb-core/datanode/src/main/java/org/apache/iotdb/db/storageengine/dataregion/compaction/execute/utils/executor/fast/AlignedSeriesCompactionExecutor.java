@@ -60,9 +60,9 @@ public class AlignedSeriesCompactionExecutor extends SeriesCompactionExecutor {
   // measurementID -> tsfile resource -> timeseries metadata <startOffset, endOffset>
   // linked hash map, which has the same measurement lexicographical order as measurementSchemas.
   // used to get the chunk metadatas from tsfile directly according to timeseries metadata offset.
-  private final Map<String, Map<TsFileResource, Pair<Long, Long>>> timeseriesMetadataOffsetMap;
+  protected final Map<String, Map<TsFileResource, Pair<Long, Long>>> timeseriesMetadataOffsetMap;
 
-  private final List<IMeasurementSchema> measurementSchemas;
+  protected final List<IMeasurementSchema> measurementSchemas;
   private final IMeasurementSchema timeColumnMeasurementSchema;
   private final Map<String, IMeasurementSchema> measurementSchemaMap;
 

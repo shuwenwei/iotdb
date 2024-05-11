@@ -539,10 +539,10 @@ public class NewReadChunkCompactionPerformerWithAlignedSeriesTest extends Abstra
         generateSingleAlignedSeriesFile(
             "d0",
             Arrays.asList("s0", "s1", "s2"),
-            new TimeRange[] {new TimeRange(10000, 20000), new TimeRange(30000, 40000)},
+            new TimeRange[] {new TimeRange(10000, 20000), new TimeRange(30000, 120000)},
             TSEncoding.PLAIN,
             CompressionType.LZ4,
-            Arrays.asList(false, false, false),
+            Arrays.asList(false, false, true),
             true);
     seqResources.add(seqResource1);
 
@@ -550,7 +550,7 @@ public class NewReadChunkCompactionPerformerWithAlignedSeriesTest extends Abstra
         generateSingleAlignedSeriesFile(
             "d0",
             Arrays.asList("s0", "s1", "s2"),
-            new TimeRange[] {new TimeRange(60000, 70000), new TimeRange(80000, 90000)},
+            new TimeRange[] {new TimeRange(160000, 170000), new TimeRange(180000, 190000)},
             TSEncoding.PLAIN,
             CompressionType.LZ4,
             Arrays.asList(false, false, false),
