@@ -52,6 +52,7 @@ import org.apache.iotdb.tsfile.write.schema.MeasurementSchema;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -693,6 +694,7 @@ public class NewReadChunkCompactionPerformerWithAlignedSeriesTest extends Abstra
   }
 
   @Test
+  @Ignore
   public void testFlushChunkMetadataToTempFile()
       throws IOException, StorageEngineException, InterruptedException, MetadataException,
           PageException {

@@ -73,8 +73,26 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
 
   @Override
   public void execute() throws IOException, PageException {
+    markAlignedChunkHasDeletion(readerAndChunkMetadataList);
     List<CompactChunkPlan> compactChunkPlans = compactFirstColumnGroup();
     compactLeftColumnGroups(compactChunkPlans);
+  }
+
+  private void markAlignedChunkHasDeletion(
+      LinkedList<Pair<TsFileSequenceReader, List<AlignedChunkMetadata>>>
+          readerAndChunkMetadataList) {
+    for (Pair<TsFileSequenceReader, List<AlignedChunkMetadata>> pair : readerAndChunkMetadataList) {
+      List<AlignedChunkMetadata> alignedChunkMetadataList = pair.getRight();
+      for (AlignedChunkMetadata alignedChunkMetadata : alignedChunkMetadataList) {
+        IChunkMetadata timeChunkMetadata = alignedChunkMetadata.getTimeChunkMetadata();
+        for (IChunkMetadata iChunkMetadata : alignedChunkMetadata.getValueChunkMetadataList()) {
+          if (iChunkMetadata != null && iChunkMetadata.isModified()) {
+            timeChunkMetadata.setModified(true);
+            break;
+          }
+        }
+      }
+    }
   }
 
   private List<CompactChunkPlan> compactFirstColumnGroup() throws IOException, PageException {
@@ -196,6 +214,9 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
           summary,
           timeSchema,
           valueSchemaList);
+      int compactionFileLevel =
+          Integer.parseInt(this.targetResource.getTsFile().getName().split("-")[2]);
+      this.flushPolicy = new FirstColumnGroupFlushDataBlockPolicy(compactionFileLevel);
     }
 
     @Override
@@ -232,6 +253,20 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
       return new GroupCompactionAlignedPagePointReader(
           alignedPageReader.getTimePageReader(), alignedPageReader.getValuePageReaderList());
     }
+
+    private class FirstColumnGroupFlushDataBlockPolicy extends FlushDataBlockPolicy {
+
+      public FirstColumnGroupFlushDataBlockPolicy(int compactionFileLevel) {
+        super(compactionFileLevel);
+      }
+
+      @Override
+      public boolean canCompactCurrentChunkByDirectlyFlush(
+          ChunkLoader timeChunk, List<ChunkLoader> valueChunks) throws IOException {
+        return !timeChunk.getChunkMetadata().isModified()
+            && super.canCompactCurrentChunkByDirectlyFlush(timeChunk, valueChunks);
+      }
+    }
   }
 
   public static class NonFirstAlignedSeriesGroupCompactionExecutor
@@ -258,7 +293,7 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
           timeSchema,
           valueSchemaList);
       this.compactionPlan = compactionPlan;
-      this.flushPolicy = new ColumnGroupFlushDataBlockPolicy();
+      this.flushPolicy = new NonFirstColumnGroupFlushDataBlockPolicy();
       this.chunkWriter =
           new NonFirstGroupAlignedChunkWriter(timeSchema, schemaList, compactionPlan.get(0));
     }
@@ -311,9 +346,9 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
           alignedPageReader.getTimePageReader(), alignedPageReader.getValuePageReaderList());
     }
 
-    private class ColumnGroupFlushDataBlockPolicy extends FlushDataBlockPolicy {
+    private class NonFirstColumnGroupFlushDataBlockPolicy extends FlushDataBlockPolicy {
 
-      public ColumnGroupFlushDataBlockPolicy() {
+      public NonFirstColumnGroupFlushDataBlockPolicy() {
         super(0);
       }
 
@@ -325,6 +360,7 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
 
       @Override
       protected boolean canFlushCurrentChunkWriter() {
+        // the parameters are not used in this implementation
         return chunkWriter.checkIsChunkSizeOverThreshold(0, 0, true);
       }
 
