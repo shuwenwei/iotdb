@@ -55,8 +55,8 @@ public class ReadChunkInnerCompactionEstimator extends AbstractInnerSpaceEstimat
         taskInfo.getTotalFileSize() * compressionRatio / taskInfo.getTotalChunkNum();
 
     int maxConcurrentSeriesNum =
-        Math.max(
-            IoTDBDescriptor.getInstance().getConfig().getMaxConcurrentAlignedSeriesInCompaction(),
+        Math.min(
+            config.getMaxConcurrentAlignedSeriesInCompaction(),
             taskInfo.getMaxConcurrentSeriesNum());
 
     long maxConcurrentSeriesSizeOfTotalFiles =
