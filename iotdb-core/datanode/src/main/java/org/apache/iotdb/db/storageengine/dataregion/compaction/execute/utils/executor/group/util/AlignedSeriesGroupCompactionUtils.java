@@ -19,6 +19,7 @@
 
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.group.util;
 
+import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.tsfile.file.metadata.enums.TSDataType;
 import org.apache.iotdb.tsfile.write.schema.IMeasurementSchema;
 
@@ -28,7 +29,8 @@ import java.util.Set;
 
 public class AlignedSeriesGroupCompactionUtils {
 
-  private static int compactColumnNum = 2;
+  private static final int compactColumnNum =
+      IoTDBDescriptor.getInstance().getConfig().getMaxConcurrentAlignedSeriesInCompaction();
 
   private AlignedSeriesGroupCompactionUtils() {}
 
@@ -42,13 +44,8 @@ public class AlignedSeriesGroupCompactionUtils {
       if (compactedMeasurements.contains(schema.getMeasurementId())) {
         continue;
       }
-      if (!compactedMeasurements.contains(schema.getMeasurementId())
-          && schema.getType().equals(TSDataType.TEXT)) {
-        compactedMeasurements.add(schema.getMeasurementId());
-        selectedColumnGroup.add(schema);
-      }
-      selectedColumnGroup.add(schema);
       compactedMeasurements.add(schema.getMeasurementId());
+      selectedColumnGroup.add(schema);
       if (compactedMeasurements.size() == schemaList.size()) {
         return selectedColumnGroup;
       }

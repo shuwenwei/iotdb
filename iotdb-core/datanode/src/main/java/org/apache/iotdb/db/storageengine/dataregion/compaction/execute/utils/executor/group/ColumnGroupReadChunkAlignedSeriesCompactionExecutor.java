@@ -304,7 +304,7 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
       currentCompactChunk++;
       if (currentCompactChunk < compactionPlan.size()) {
         CompactChunkPlan chunkRecord = compactionPlan.get(currentCompactChunk);
-        this.chunkWriter = new NonFirstGroupAlignedChunkWriter(timeSchema, schemaList, chunkRecord);
+        ((NonFirstGroupAlignedChunkWriter) this.chunkWriter).setCompactChunkPlan(chunkRecord);
       }
     }
 

@@ -97,4 +97,9 @@ public class NonFirstGroupAlignedChunkWriter extends AlignedChunkWriterImpl {
   public int getCurrentPage() {
     return currentPage;
   }
+
+  public void setCompactChunkPlan(CompactChunkPlan compactChunkPlan) {
+    this.compactChunkPlan = compactChunkPlan;
+    this.currentPage = 0;
+  }
 }
