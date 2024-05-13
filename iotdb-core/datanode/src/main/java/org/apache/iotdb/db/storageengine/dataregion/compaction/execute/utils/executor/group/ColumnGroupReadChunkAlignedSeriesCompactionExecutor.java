@@ -314,6 +314,7 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
       writer.markStartingWritingAligned();
       checkAndUpdatePreviousTimestamp(timeChunk.getChunkMetadata().getStartTime());
       checkAndUpdatePreviousTimestamp(timeChunk.getChunkMetadata().getEndTime());
+      // skip time chunk
       timeChunk.clear();
       int nonEmptyChunkNum = 0;
       for (int i = 0; i < valueChunks.size(); i++) {
@@ -335,6 +336,24 @@ public class ColumnGroupReadChunkAlignedSeriesCompactionExecutor
       summary.increaseDirectlyFlushChunkNum(nonEmptyChunkNum);
       writer.markEndingWritingAligned();
       currentCompactChunk++;
+    }
+
+    @Override
+    protected void compactAlignedPageByFlush(PageLoader timePage, List<PageLoader> valuePageLoaders)
+        throws PageException, IOException {
+      int nonEmptyPage = 0;
+      checkAndUpdatePreviousTimestamp(timePage.getHeader().getStartTime());
+      checkAndUpdatePreviousTimestamp(timePage.getHeader().getEndTime());
+      // skip time page
+      timePage.clear();
+      for (int i = 0; i < valuePageLoaders.size(); i++) {
+        PageLoader valuePage = valuePageLoaders.get(i);
+        if (!valuePage.isEmpty()) {
+          nonEmptyPage++;
+        }
+        valuePage.flushToValueChunkWriter(chunkWriter, i);
+      }
+      summary.increaseDirectlyFlushPageNum(nonEmptyPage);
     }
 
     @Override

@@ -318,7 +318,7 @@ public class ReadChunkAlignedSeriesCompactionExecutor {
     return new InstantPageLoader();
   }
 
-  private void compactAlignedPageByFlush(PageLoader timePage, List<PageLoader> valuePageLoaders)
+  protected void compactAlignedPageByFlush(PageLoader timePage, List<PageLoader> valuePageLoaders)
       throws PageException, IOException {
     int nonEmptyPage = 1;
     checkAndUpdatePreviousTimestamp(timePage.getHeader().getStartTime());
