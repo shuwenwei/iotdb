@@ -36,6 +36,7 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.utils.CompactionT
 import org.apache.iotdb.db.storageengine.dataregion.modification.Deletion;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
+import org.apache.iotdb.db.storageengine.dataregion.utils.TsFileResourceUtils;
 import org.apache.iotdb.tsfile.common.conf.TSFileDescriptor;
 import org.apache.iotdb.tsfile.common.constant.TsFileConstant;
 import org.apache.iotdb.tsfile.exception.write.PageException;
@@ -71,6 +72,7 @@ public class NewReadChunkCompactionPerformerWithAlignedSeriesTest extends Abstra
   long originTargetChunkPointNum;
   int originTargetPageSize;
   int originTargetPagePointNum;
+  int originMaxConcurrentAlignedSeriesInCompaction;
 
   @Before
   public void setUp()
@@ -81,11 +83,16 @@ public class NewReadChunkCompactionPerformerWithAlignedSeriesTest extends Abstra
     originTargetPageSize = TSFileDescriptor.getInstance().getConfig().getPageSizeInByte();
     originTargetPagePointNum =
         TSFileDescriptor.getInstance().getConfig().getMaxNumberOfPointsInPage();
+    originMaxConcurrentAlignedSeriesInCompaction =
+        IoTDBDescriptor.getInstance().getConfig().getMaxConcurrentAlignedSeriesInCompaction();
 
     IoTDBDescriptor.getInstance().getConfig().setTargetChunkSize(1048576);
     IoTDBDescriptor.getInstance().getConfig().setTargetChunkPointNum(100000);
     TSFileDescriptor.getInstance().getConfig().setPageSizeInByte(64 * 1024);
     TSFileDescriptor.getInstance().getConfig().setMaxNumberOfPointsInPage(10000);
+    IoTDBDescriptor.getInstance()
+        .getConfig()
+        .setMaxConcurrentAlignedSeriesInCompaction(Integer.MAX_VALUE);
   }
 
   @After
@@ -95,6 +102,9 @@ public class NewReadChunkCompactionPerformerWithAlignedSeriesTest extends Abstra
     IoTDBDescriptor.getInstance().getConfig().setTargetChunkPointNum(originTargetChunkPointNum);
     TSFileDescriptor.getInstance().getConfig().setPageSizeInByte(originTargetPageSize);
     TSFileDescriptor.getInstance().getConfig().setMaxNumberOfPointsInPage(originTargetPagePointNum);
+    IoTDBDescriptor.getInstance()
+        .getConfig()
+        .setMaxConcurrentAlignedSeriesInCompaction(originMaxConcurrentAlignedSeriesInCompaction);
   }
 
   @Test
@@ -137,7 +147,7 @@ public class NewReadChunkCompactionPerformerWithAlignedSeriesTest extends Abstra
         Collections.singletonList(targetResource), true, COMPACTION_TEST_SG);
     Assert.assertEquals(16, summary.getDirectlyFlushChunkNum());
     Assert.assertEquals(0, summary.getDeserializeChunkCount());
-    //    TsFileResourceUtils.validateTsFileDataCorrectness(targetResource);
+    TsFileResourceUtils.validateTsFileDataCorrectness(targetResource);
 
     Assert.assertEquals(
         CompactionCheckerUtils.getDataByQuery(
@@ -570,8 +580,8 @@ public class NewReadChunkCompactionPerformerWithAlignedSeriesTest extends Abstra
     performer.perform();
     CompactionUtils.moveTargetFile(
         Collections.singletonList(targetResource), true, COMPACTION_TEST_SG);
-    //    Assert.assertEquals(16, summary.getDeserializeChunkCount());
-    //    Assert.assertEquals(16, summary.getDirectlyFlushPageCount());
+    Assert.assertEquals(16, summary.getDeserializeChunkCount());
+    Assert.assertEquals(16, summary.getDirectlyFlushPageCount());
     Assert.assertEquals(
         CompactionCheckerUtils.getDataByQuery(
             getPaths(seqResources), null, seqResources, unseqResources),
@@ -620,8 +630,8 @@ public class NewReadChunkCompactionPerformerWithAlignedSeriesTest extends Abstra
     performer.perform();
     CompactionUtils.moveTargetFile(
         Collections.singletonList(targetResource), true, COMPACTION_TEST_SG);
-    //    Assert.assertEquals(16, summary.getDeserializeChunkCount());
-    //    Assert.assertEquals(16, summary.getDeserializePageCount());
+    Assert.assertEquals(16, summary.getDeserializeChunkCount());
+    Assert.assertEquals(16, summary.getDeserializePageCount());
     Assert.assertEquals(
         CompactionCheckerUtils.getDataByQuery(
             getPaths(seqResources), null, seqResources, unseqResources),
@@ -681,7 +691,7 @@ public class NewReadChunkCompactionPerformerWithAlignedSeriesTest extends Abstra
     performer.perform();
     CompactionUtils.moveTargetFile(
         Collections.singletonList(targetResource), true, COMPACTION_TEST_SG);
-    //    Assert.assertEquals(16, summary.getDirectlyFlushChunkNum());
+    Assert.assertEquals(16, summary.getDirectlyFlushChunkNum());
     Assert.assertEquals(0, summary.getDirectlyFlushPageCount());
     Assert.assertEquals(
         CompactionCheckerUtils.getDataByQuery(
@@ -760,17 +770,14 @@ public class NewReadChunkCompactionPerformerWithAlignedSeriesTest extends Abstra
     performer.perform();
     CompactionUtils.moveTargetFile(
         Collections.singletonList(targetResource), true, COMPACTION_TEST_SG);
-    if (true) {
-      return;
-    }
-    Assert.assertEquals(
-        CompactionCheckerUtils.getDataByQuery(
-            getPaths(seqResources), null, seqResources, unseqResources),
-        CompactionCheckerUtils.getDataByQuery(
-            getPaths(Collections.singletonList(targetResource)),
-            null,
-            Collections.singletonList(targetResource),
-            Collections.emptyList()));
+    //    Assert.assertEquals(
+    //        CompactionCheckerUtils.getDataByQuery(
+    //            getPaths(seqResources), null, seqResources, unseqResources),
+    //        CompactionCheckerUtils.getDataByQuery(
+    //            getPaths(Collections.singletonList(targetResource)),
+    //            null,
+    //            Collections.singletonList(targetResource),
+    //            Collections.emptyList()));
     Assert.assertEquals(devices.size(), targetResource.buildDeviceTimeIndex().getDevices().size());
   }
 
@@ -837,31 +844,32 @@ public class NewReadChunkCompactionPerformerWithAlignedSeriesTest extends Abstra
   private List<PartialPath> getPaths(List<TsFileResource> resources)
       throws IOException, IllegalPathException {
     Set<PartialPath> paths = new HashSet<>();
-    MultiTsFileDeviceIterator deviceIterator = new MultiTsFileDeviceIterator(resources);
-    while (deviceIterator.hasNextDevice()) {
-      Pair<IDeviceID, Boolean> iDeviceIDBooleanPair = deviceIterator.nextDevice();
-      IDeviceID deviceID = iDeviceIDBooleanPair.getLeft();
-      boolean isAlign = iDeviceIDBooleanPair.getRight();
-      Map<String, MeasurementSchema> schemaMap = deviceIterator.getAllSchemasOfCurrentDevice();
-      IMeasurementSchema timeSchema = schemaMap.remove(TsFileConstant.TIME_COLUMN_ID);
-      List<IMeasurementSchema> measurementSchemas = new ArrayList<>(schemaMap.values());
-      if (measurementSchemas.isEmpty()) {
-        continue;
+    try (MultiTsFileDeviceIterator deviceIterator = new MultiTsFileDeviceIterator(resources)) {
+      while (deviceIterator.hasNextDevice()) {
+        Pair<IDeviceID, Boolean> iDeviceIDBooleanPair = deviceIterator.nextDevice();
+        IDeviceID deviceID = iDeviceIDBooleanPair.getLeft();
+        boolean isAlign = iDeviceIDBooleanPair.getRight();
+        Map<String, MeasurementSchema> schemaMap = deviceIterator.getAllSchemasOfCurrentDevice();
+        IMeasurementSchema timeSchema = schemaMap.remove(TsFileConstant.TIME_COLUMN_ID);
+        List<IMeasurementSchema> measurementSchemas = new ArrayList<>(schemaMap.values());
+        if (measurementSchemas.isEmpty()) {
+          continue;
+        }
+        List<String> existedMeasurements =
+            measurementSchemas.stream()
+                .map(IMeasurementSchema::getMeasurementId)
+                .collect(Collectors.toList());
+        PartialPath seriesPath;
+        if (isAlign) {
+          seriesPath =
+              new AlignedPath(
+                  ((PlainDeviceID) deviceID).toStringID(), existedMeasurements, measurementSchemas);
+        } else {
+          seriesPath =
+              new MeasurementPath(deviceID, existedMeasurements.get(0), measurementSchemas.get(0));
+        }
+        paths.add(seriesPath);
       }
-      List<String> existedMeasurements =
-          measurementSchemas.stream()
-              .map(IMeasurementSchema::getMeasurementId)
-              .collect(Collectors.toList());
-      PartialPath seriesPath;
-      if (isAlign) {
-        seriesPath =
-            new AlignedPath(
-                ((PlainDeviceID) deviceID).toStringID(), existedMeasurements, measurementSchemas);
-      } else {
-        seriesPath =
-            new MeasurementPath(deviceID, existedMeasurements.get(0), measurementSchemas.get(0));
-      }
-      paths.add(seriesPath);
     }
     return new ArrayList<>(paths);
   }

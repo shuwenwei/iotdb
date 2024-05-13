@@ -29,13 +29,12 @@ import java.util.Set;
 
 public class AlignedSeriesGroupCompactionUtils {
 
-  private static final int compactColumnNum =
-      IoTDBDescriptor.getInstance().getConfig().getMaxConcurrentAlignedSeriesInCompaction();
-
   private AlignedSeriesGroupCompactionUtils() {}
 
   public static List<IMeasurementSchema> selectColumnGroupToCompact(
       List<IMeasurementSchema> schemaList, Set<String> compactedMeasurements) {
+    int compactColumnNum =
+        IoTDBDescriptor.getInstance().getConfig().getMaxConcurrentAlignedSeriesInCompaction();
     List<IMeasurementSchema> selectedColumnGroup = new ArrayList<>(compactColumnNum);
     for (IMeasurementSchema schema : schemaList) {
       if (!schema.getType().equals(TSDataType.TEXT)) {
