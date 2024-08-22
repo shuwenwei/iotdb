@@ -22,7 +22,6 @@ package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils;
 import org.apache.iotdb.commons.conf.IoTDBConstant;
 import org.apache.iotdb.commons.exception.IllegalPathException;
 import org.apache.iotdb.commons.path.MeasurementPath;
-import org.apache.iotdb.commons.path.PartialPath;
 import org.apache.iotdb.commons.utils.CommonDateTimeUtils;
 import org.apache.iotdb.db.queryengine.plan.analyze.cache.schema.DataNodeTTLCache;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.io.CompactionTsFileReader;
@@ -429,11 +428,10 @@ public class MultiTsFileDeviceIterator implements AutoCloseable {
         continue;
       }
       List<Modification> modificationList = new ArrayList<>();
-      PartialPath path =
-          CompactionPathUtils.getPath(
-              currentDevice.getLeft(), valueChunkMetadata.getMeasurementUid());
       for (Modification modification : modifications) {
-        if (modification.getPath().matchFullPath(path)) {
+        if (modification
+            .getPath()
+            .matchFullPath(currentDevice.getLeft(), valueChunkMetadata.getMeasurementUid())) {
           modificationList.add(modification);
         }
       }
@@ -625,7 +623,6 @@ public class MultiTsFileDeviceIterator implements AutoCloseable {
 
       LinkedList<Pair<TsFileSequenceReader, List<ChunkMetadata>>>
           readerAndChunkMetadataForThisSeries = new LinkedList<>();
-      PartialPath path = CompactionPathUtils.getPath(device, currentCompactingSeries);
 
       for (TsFileResource resource : tsFileResourcesSortedByAsc) {
         TsFileSequenceReader reader = readerMap.get(resource);
@@ -654,7 +651,7 @@ public class MultiTsFileDeviceIterator implements AutoCloseable {
           LinkedList<Modification> modificationForCurrentSeries = new LinkedList<>();
           // collect the modifications for current series
           for (Modification modification : modificationsInThisResource) {
-            if (modification.getPath().matchFullPath(path)) {
+            if (modification.getPath().matchFullPath(device, currentCompactingSeries)) {
               modificationForCurrentSeries.add(modification);
             }
           }

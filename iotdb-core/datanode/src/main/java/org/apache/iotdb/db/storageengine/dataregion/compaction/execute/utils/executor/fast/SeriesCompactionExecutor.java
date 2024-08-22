@@ -20,7 +20,6 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.fast;
 
 import org.apache.iotdb.commons.exception.IllegalPathException;
-import org.apache.iotdb.commons.path.PartialPath;
 import org.apache.iotdb.commons.path.PatternTreeMap;
 import org.apache.iotdb.db.exception.WriteProcessException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.FastCompactionTaskSummary;
@@ -474,13 +473,13 @@ public abstract class SeriesCompactionExecutor {
    * @param path name of the time series
    */
   protected List<Modification> getModificationsFromCache(
-      TsFileResource tsFileResource, PartialPath path) {
+      TsFileResource tsFileResource, IDeviceID deviceId, String measurement) {
     PatternTreeMap<Modification, PatternTreeMapFactory.ModsSerializer> allModifications =
         modificationCacheMap.get(tsFileResource.getTsFile().getName());
     if (allModifications == null) {
       return Collections.emptyList();
     }
-    return ModificationFile.sortAndMerge(allModifications.getOverlapped(path));
+    return ModificationFile.sortAndMerge(allModifications.getOverlapped(deviceId, measurement));
   }
 
   @SuppressWarnings("squid:S3776")

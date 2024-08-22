@@ -23,7 +23,6 @@ import org.apache.iotdb.commons.exception.IllegalPathException;
 import org.apache.iotdb.commons.path.PatternTreeMap;
 import org.apache.iotdb.db.exception.WriteProcessException;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subtask.FastCompactionTaskSummary;
-import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.CompactionPathUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.ModifiedStatus;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.batch.utils.AlignedSeriesBatchCompactionUtils;
 import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.utils.executor.fast.element.AlignedPageElement;
@@ -239,17 +238,11 @@ public class FastAlignedSeriesCompactionExecutor extends SeriesCompactionExecuto
           .getValueChunkMetadataList()
           .forEach(
               x -> {
-                try {
-                  if (x == null) {
-                    valueModifications.add(null);
-                  } else {
-                    valueModifications.add(
-                        getModificationsFromCache(
-                            resource,
-                            CompactionPathUtils.getPath(deviceId, x.getMeasurementUid())));
-                  }
-                } catch (IllegalPathException e) {
-                  throw new RuntimeException(e);
+                if (x == null) {
+                  valueModifications.add(null);
+                } else {
+                  valueModifications.add(
+                      getModificationsFromCache(resource, deviceId, x.getMeasurementUid()));
                 }
               });
 
