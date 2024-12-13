@@ -206,7 +206,7 @@ public class IoTDBDataRegionAsyncConnector extends IoTDBConnector {
       for (int i = 0; i < tablet.getRowSize(); i++) {
         LOGGER.warn(
             "{} sink insertNode println device {}",
-            ((PipeInsertNodeTabletInsertionEvent) tabletInsertionEvent).getPipeName(),
+            ((PipeRawTabletInsertionEvent) tabletInsertionEvent).getPipeName(),
             tablet.getDeviceID(i));
       }
     }
