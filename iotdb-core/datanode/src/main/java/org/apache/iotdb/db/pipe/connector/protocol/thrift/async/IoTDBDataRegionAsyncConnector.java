@@ -44,6 +44,11 @@ import org.apache.iotdb.db.pipe.event.common.tablet.PipeRawTabletInsertionEvent;
 import org.apache.iotdb.db.pipe.event.common.terminate.PipeTerminateEvent;
 import org.apache.iotdb.db.pipe.event.common.tsfile.PipeTsFileInsertionEvent;
 import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.InsertNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.InsertRowNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.RelationalInsertRowNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.RelationalInsertRowsNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.RelationalInsertTabletNode;
+import org.apache.iotdb.db.storageengine.dataregion.wal.buffer.WALEntry;
 import org.apache.iotdb.pipe.api.PipeConnector;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeConnectorRuntimeConfiguration;
 import org.apache.iotdb.pipe.api.customizer.parameter.PipeParameterValidator;
@@ -54,7 +59,12 @@ import org.apache.iotdb.pipe.api.event.dml.insertion.TsFileInsertionEvent;
 import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
 
 import org.apache.tsfile.exception.write.WriteProcessException;
+import org.apache.tsfile.file.metadata.IDeviceID;
+import org.apache.tsfile.file.metadata.TimeseriesMetadata;
+import org.apache.tsfile.read.TsFileSequenceReader;
+import org.apache.tsfile.read.TsFileSequenceReaderTimeseriesMetadataIterator;
 import org.apache.tsfile.utils.Pair;
+import org.apache.tsfile.write.record.Tablet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -153,6 +163,52 @@ public class IoTDBDataRegionAsyncConnector extends IoTDBConnector {
               + "Current event: {}.",
           tabletInsertionEvent);
       return;
+    }
+
+    if (tabletInsertionEvent instanceof PipeInsertNodeTabletInsertionEvent) {
+      final PipeInsertNodeTabletInsertionEvent pipeInsertNodeTabletInsertionEvent =
+          (PipeInsertNodeTabletInsertionEvent) tabletInsertionEvent;
+
+      if (pipeInsertNodeTabletInsertionEvent.isTableModelEvent()) {
+        InsertNode insertNode =
+            pipeInsertNodeTabletInsertionEvent.getInsertNodeViaCacheIfPossible();
+        if (Objects.isNull(insertNode)) {
+          insertNode =
+              (InsertNode)
+                  WALEntry.deserializeForConsensus(
+                      pipeInsertNodeTabletInsertionEvent.getByteBuffer());
+        }
+        if (insertNode instanceof RelationalInsertTabletNode) {
+          for (int i = 0; i < ((RelationalInsertTabletNode) insertNode).getRowCount(); i++) {
+            LOGGER.warn(
+                "{} sink insertNode println device {}",
+                ((PipeInsertNodeTabletInsertionEvent) tabletInsertionEvent).getPipeName(),
+                ((RelationalInsertTabletNode) insertNode).getDeviceID(i));
+          }
+        } else if (insertNode instanceof RelationalInsertRowsNode) {
+          for (InsertRowNode rowNode :
+              ((RelationalInsertRowsNode) insertNode).getInsertRowNodeList()) {
+            LOGGER.warn(
+                "{} sink insertNode println device {}",
+                ((PipeInsertNodeTabletInsertionEvent) tabletInsertionEvent).getPipeName(),
+                ((RelationalInsertRowNode) insertNode).getDeviceID());
+          }
+        } else if (insertNode instanceof RelationalInsertRowNode) {
+          LOGGER.warn(
+              "{} sink insertNode println device {}",
+              ((PipeInsertNodeTabletInsertionEvent) tabletInsertionEvent).getPipeName(),
+              ((RelationalInsertRowNode) insertNode).getDeviceID());
+        }
+      }
+
+    } else { // tabletInsertionEvent instanceof PipeRawTabletInsertionEvent
+      final Tablet tablet = ((PipeRawTabletInsertionEvent) tabletInsertionEvent).convertToTablet();
+      for (int i = 0; i < tablet.getRowSize(); i++) {
+        LOGGER.warn(
+            "{} sink insertNode println device {}",
+            ((PipeInsertNodeTabletInsertionEvent) tabletInsertionEvent).getPipeName(),
+            tablet.getDeviceID(i));
+      }
     }
 
     if (isTabletBatchModeEnabled) {
@@ -328,6 +384,26 @@ public class IoTDBDataRegionAsyncConnector extends IoTDBConnector {
       // Just in case. To avoid the case that exception occurred when constructing the handler.
       if (!pipeTsFileInsertionEvent.getTsFile().exists()) {
         throw new FileNotFoundException(pipeTsFileInsertionEvent.getTsFile().getAbsolutePath());
+      }
+
+      try (final TsFileSequenceReader reader =
+          new TsFileSequenceReader(
+              (((PipeTsFileInsertionEvent) tsFileInsertionEvent).getTsFile()).getAbsolutePath())) {
+        final TsFileSequenceReaderTimeseriesMetadataIterator timeseriesMetadataIterator =
+            new TsFileSequenceReaderTimeseriesMetadataIterator(reader, true, 1);
+        while (timeseriesMetadataIterator.hasNext()) {
+          final Map<IDeviceID, List<TimeseriesMetadata>> device2TimeseriesMetadata =
+              timeseriesMetadataIterator.next();
+
+          for (IDeviceID deviceId : device2TimeseriesMetadata.keySet()) {
+            LOGGER.warn(
+                "{} sink load tsfile println device {}",
+                ((PipeTsFileInsertionEvent) tsFileInsertionEvent).getPipeName(),
+                deviceId);
+          }
+        }
+      } catch (Exception e) {
+        LOGGER.error(e.getMessage());
       }
 
       final PipeTransferTsFileHandler pipeTransferTsFileHandler =
