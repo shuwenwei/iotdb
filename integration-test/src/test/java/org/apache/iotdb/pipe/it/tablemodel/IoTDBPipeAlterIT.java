@@ -42,11 +42,11 @@ import java.util.function.Consumer;
 
 import static org.junit.Assert.fail;
 
-@Ignore
 @RunWith(IoTDBTestRunner.class)
 @Category({MultiClusterIT2TableModel.class})
 public class IoTDBPipeAlterIT extends AbstractPipeTableModelTestIT {
 
+  @Ignore
   @Test
   public void testBasicAlterPipe() throws Exception {
     final DataNodeWrapper receiverDataNode = receiverEnv.getDataNodeWrapper(0);
@@ -374,6 +374,7 @@ public class IoTDBPipeAlterIT extends AbstractPipeTableModelTestIT {
     }
   }
 
+  @Ignore
   @Test
   public void testAlterPipeFailure() {
     final DataNodeWrapper receiverDataNode = receiverEnv.getDataNodeWrapper(0);
