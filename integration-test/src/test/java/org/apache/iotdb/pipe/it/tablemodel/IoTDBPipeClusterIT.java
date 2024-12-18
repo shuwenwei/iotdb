@@ -269,6 +269,11 @@ public class IoTDBPipeClusterIT extends AbstractPipeTableModelTestIT {
 
     try {
       TestUtils.restartCluster(senderEnv);
+      try {
+        Thread.sleep(5000);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
       TestUtils.restartCluster(receiverEnv);
     } catch (final Throwable e) {
       e.printStackTrace();
