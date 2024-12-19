@@ -230,7 +230,7 @@ public class PipeDataRegionAssigner implements Closeable {
                       LOGGER.warn(
                           "{} assigner realtime  insertNode println device {}",
                           extractor.getPipeName(),
-                          ((RelationalInsertRowNode) insertNode).getDeviceID());
+                          ((RelationalInsertRowNode) rowNode).getDeviceID());
                     }
                   } else if (insertNode instanceof RelationalInsertRowNode) {
                     LOGGER.warn(

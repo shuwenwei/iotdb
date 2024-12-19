@@ -191,7 +191,7 @@ public class IoTDBDataRegionAsyncConnector extends IoTDBConnector {
             LOGGER.warn(
                 "{} sink insertNode println device {}",
                 ((PipeInsertNodeTabletInsertionEvent) tabletInsertionEvent).getPipeName(),
-                ((RelationalInsertRowNode) insertNode).getDeviceID());
+                ((RelationalInsertRowNode) rowNode).getDeviceID());
           }
         } else if (insertNode instanceof RelationalInsertRowNode) {
           LOGGER.warn(
