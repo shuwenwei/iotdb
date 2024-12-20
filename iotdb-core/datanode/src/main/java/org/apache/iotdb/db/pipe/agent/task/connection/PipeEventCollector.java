@@ -29,14 +29,27 @@ import org.apache.iotdb.db.pipe.event.common.heartbeat.PipeHeartbeatEvent;
 import org.apache.iotdb.db.pipe.event.common.tablet.PipeInsertNodeTabletInsertionEvent;
 import org.apache.iotdb.db.pipe.event.common.tablet.PipeRawTabletInsertionEvent;
 import org.apache.iotdb.db.pipe.event.common.tsfile.PipeTsFileInsertionEvent;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.InsertNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.InsertRowNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.RelationalInsertRowNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.RelationalInsertRowsNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.RelationalInsertTabletNode;
 import org.apache.iotdb.pipe.api.collector.EventCollector;
 import org.apache.iotdb.pipe.api.event.Event;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
 import org.apache.iotdb.pipe.api.exception.PipeException;
 
+import org.apache.tsfile.file.metadata.IDeviceID;
+import org.apache.tsfile.file.metadata.TimeseriesMetadata;
+import org.apache.tsfile.read.TsFileSequenceReader;
+import org.apache.tsfile.read.TsFileSequenceReaderTimeseriesMetadataIterator;
+import org.apache.tsfile.write.record.Tablet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class PipeEventCollector implements EventCollector {
@@ -88,6 +101,38 @@ public class PipeEventCollector implements EventCollector {
   }
 
   private void parseAndCollectEvent(final PipeInsertNodeTabletInsertionEvent sourceEvent) {
+    if (Objects.nonNull(sourceEvent)) {
+      if (sourceEvent instanceof PipeInsertNodeTabletInsertionEvent) {
+        try {
+          PipeInsertNodeTabletInsertionEvent tabletInsertionEvent =
+              (PipeInsertNodeTabletInsertionEvent) sourceEvent;
+          final InsertNode insertNode = tabletInsertionEvent.getInsertNode();
+          if (insertNode instanceof RelationalInsertTabletNode) {
+            for (int i = 0; i < ((RelationalInsertTabletNode) insertNode).getRowCount(); i++) {
+              LOGGER.warn(
+                  "{}  processor insertNode println device {}",
+                  sourceEvent.getPipeName(),
+                  ((RelationalInsertTabletNode) insertNode).getDeviceID(i));
+            }
+          } else if (insertNode instanceof RelationalInsertRowsNode) {
+            for (InsertRowNode rowNode :
+                ((RelationalInsertRowsNode) insertNode).getInsertRowNodeList()) {
+              LOGGER.warn(
+                  "{} processor insertNode println device {}",
+                  sourceEvent.getPipeName(),
+                  ((RelationalInsertRowNode) rowNode).getDeviceID());
+            }
+          } else if (insertNode instanceof RelationalInsertRowNode) {
+            LOGGER.warn(
+                "{} processor insertNode println device {}",
+                sourceEvent.getPipeName(),
+                ((RelationalInsertRowNode) insertNode).getDeviceID());
+          }
+        } catch (Exception e) {
+          LOGGER.error(e.getMessage());
+        }
+      }
+    }
     if (sourceEvent.shouldParseTimeOrPattern()) {
       for (final PipeRawTabletInsertionEvent parsedEvent :
           sourceEvent.toRawTabletInsertionEvents()) {
@@ -118,7 +163,28 @@ public class PipeEventCollector implements EventCollector {
             || (sourceEvent.isTableModelEvent()
                 && sourceEvent.getTablePattern() == null
                 && !sourceEvent.shouldParseTime()))) {
-      collectEvent(sourceEvent);
+      if (sourceEvent instanceof PipeTsFileInsertionEvent
+          && (((PipeTsFileInsertionEvent) sourceEvent).isTableModelEvent())) {
+        try (final TsFileSequenceReader reader =
+            new TsFileSequenceReader(
+                (((PipeTsFileInsertionEvent) sourceEvent).getTsFile()).getAbsolutePath())) {
+          final TsFileSequenceReaderTimeseriesMetadataIterator timeseriesMetadataIterator =
+              new TsFileSequenceReaderTimeseriesMetadataIterator(reader, true, 1);
+          while (timeseriesMetadataIterator.hasNext()) {
+            final Map<IDeviceID, List<TimeseriesMetadata>> device2TimeseriesMetadata =
+                timeseriesMetadataIterator.next();
+
+            for (IDeviceID deviceId : device2TimeseriesMetadata.keySet()) {
+              LOGGER.warn(
+                  "{}  processor load tsfile println device {}",
+                  sourceEvent.getPipeName(),
+                  deviceId);
+            }
+          }
+        } catch (Exception e) {
+          LOGGER.error(e.getMessage());
+        }
+      } else collectEvent(sourceEvent);
       return;
     }
 
@@ -134,6 +200,17 @@ public class PipeEventCollector implements EventCollector {
   private void collectParsedRawTableEvent(final PipeRawTabletInsertionEvent parsedEvent) {
     if (!parsedEvent.hasNoNeedParsingAndIsEmpty()) {
       hasNoGeneratedEvent = false;
+      try {
+        final Tablet tablet = ((PipeRawTabletInsertionEvent) (parsedEvent)).convertToTablet();
+        for (int i = 0; i < tablet.getRowSize(); i++) {
+          LOGGER.warn(
+              "{}  processor rawTablet println device {}",
+              parsedEvent.getPipeName(),
+              tablet.getDeviceID(i));
+        }
+      } catch (Exception e) {
+        LOGGER.error(e.getMessage());
+      }
       collectEvent(parsedEvent);
     }
   }

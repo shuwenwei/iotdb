@@ -30,6 +30,8 @@ import org.apache.iotdb.commons.pipe.extractor.IoTDBExtractor;
 import org.apache.iotdb.consensus.ConsensusFactory;
 import org.apache.iotdb.db.conf.IoTDBDescriptor;
 import org.apache.iotdb.db.pipe.event.common.heartbeat.PipeHeartbeatEvent;
+import org.apache.iotdb.db.pipe.event.common.tablet.PipeInsertNodeTabletInsertionEvent;
+import org.apache.iotdb.db.pipe.event.common.tsfile.PipeTsFileInsertionEvent;
 import org.apache.iotdb.db.pipe.extractor.dataregion.historical.PipeHistoricalDataRegionExtractor;
 import org.apache.iotdb.db.pipe.extractor.dataregion.historical.PipeHistoricalDataRegionTsFileAndDeletionExtractor;
 import org.apache.iotdb.db.pipe.extractor.dataregion.realtime.PipeRealtimeDataRegionExtractor;
@@ -39,6 +41,11 @@ import org.apache.iotdb.db.pipe.extractor.dataregion.realtime.PipeRealtimeDataRe
 import org.apache.iotdb.db.pipe.extractor.dataregion.realtime.PipeRealtimeDataRegionTsFileExtractor;
 import org.apache.iotdb.db.pipe.metric.PipeDataNodeRemainingEventAndTimeMetrics;
 import org.apache.iotdb.db.pipe.metric.PipeDataRegionExtractorMetrics;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.InsertNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.InsertRowNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.RelationalInsertRowNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.RelationalInsertRowsNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.RelationalInsertTabletNode;
 import org.apache.iotdb.db.storageengine.StorageEngine;
 import org.apache.iotdb.db.storageengine.dataregion.wal.utils.WALMode;
 import org.apache.iotdb.pipe.api.customizer.configuration.PipeExtractorRuntimeConfiguration;
@@ -49,11 +56,17 @@ import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TsFileInsertionEvent;
 import org.apache.iotdb.pipe.api.exception.PipeException;
 
+import org.apache.tsfile.file.metadata.IDeviceID;
+import org.apache.tsfile.file.metadata.TimeseriesMetadata;
+import org.apache.tsfile.read.TsFileSequenceReader;
+import org.apache.tsfile.read.TsFileSequenceReaderTimeseriesMetadataIterator;
 import org.apache.tsfile.utils.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -654,6 +667,57 @@ public class IoTDBDataRegionExtractor extends IoTDBExtractor {
       }
       if (Objects.isNull(event)) {
         event = realtimeExtractor.supply();
+      }
+    }
+    if (Objects.nonNull(event)) {
+      if (event instanceof PipeTsFileInsertionEvent
+          && (((PipeTsFileInsertionEvent) event).isTableModelEvent())) {
+        try (final TsFileSequenceReader reader =
+            new TsFileSequenceReader(
+                (((PipeTsFileInsertionEvent) event).getTsFile()).getAbsolutePath())) {
+          final TsFileSequenceReaderTimeseriesMetadataIterator timeseriesMetadataIterator =
+              new TsFileSequenceReaderTimeseriesMetadataIterator(reader, true, 1);
+          while (timeseriesMetadataIterator.hasNext()) {
+            final Map<IDeviceID, List<TimeseriesMetadata>> device2TimeseriesMetadata =
+                timeseriesMetadataIterator.next();
+
+            for (IDeviceID deviceId : device2TimeseriesMetadata.keySet()) {
+              LOGGER.warn(
+                  "{}  extractor realtime load tsfile println device {}", getPipeName(), deviceId);
+            }
+          }
+        } catch (Exception e) {
+          LOGGER.error(e.getMessage());
+        }
+      } else if (event instanceof PipeInsertNodeTabletInsertionEvent) {
+        try {
+          PipeInsertNodeTabletInsertionEvent tabletInsertionEvent =
+              (PipeInsertNodeTabletInsertionEvent) event;
+          final InsertNode insertNode = tabletInsertionEvent.getInsertNode();
+          if (insertNode instanceof RelationalInsertTabletNode) {
+            for (int i = 0; i < ((RelationalInsertTabletNode) insertNode).getRowCount(); i++) {
+              LOGGER.warn(
+                  "{}  extractor realtime insertNode println device {}",
+                  getPipeName(),
+                  ((RelationalInsertTabletNode) insertNode).getDeviceID(i));
+            }
+          } else if (insertNode instanceof RelationalInsertRowsNode) {
+            for (InsertRowNode rowNode :
+                ((RelationalInsertRowsNode) insertNode).getInsertRowNodeList()) {
+              LOGGER.warn(
+                  "{} extractor realtime  insertNode println device {}",
+                  getPipeName(),
+                  ((RelationalInsertRowNode) rowNode).getDeviceID());
+            }
+          } else if (insertNode instanceof RelationalInsertRowNode) {
+            LOGGER.warn(
+                "{} extractor realtime  insertNode println device {}",
+                this.pipeName,
+                ((RelationalInsertRowNode) insertNode).getDeviceID());
+          }
+        } catch (Exception e) {
+          LOGGER.error(e.getMessage());
+        }
       }
     }
 
