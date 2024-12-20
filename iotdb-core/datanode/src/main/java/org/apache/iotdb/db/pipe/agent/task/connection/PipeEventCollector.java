@@ -184,7 +184,8 @@ public class PipeEventCollector implements EventCollector {
         } catch (Exception e) {
           LOGGER.error(e.getMessage());
         }
-      } else collectEvent(sourceEvent);
+      }
+      collectEvent(sourceEvent);
       return;
     }
 
