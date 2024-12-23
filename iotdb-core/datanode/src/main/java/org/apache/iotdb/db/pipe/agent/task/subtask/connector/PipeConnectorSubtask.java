@@ -89,17 +89,21 @@ public class PipeConnectorSubtask extends PipeAbstractConnectorSubtask {
 
   @Override
   protected boolean executeOnce() {
+    LOGGER.info("executeOnce: Method started. {}", this);
     if (isClosed.get()) {
+      LOGGER.info("executeOnce: Component is closed. {}", this);
       return false;
     }
-
+    LOGGER.info("executeOnce: isInterrupted. {}", Thread.currentThread().isInterrupted());
     final Event event =
         lastEvent != null
             ? lastEvent
             : UserDefinedEnrichedEvent.maybeOf(inputPendingQueue.waitedPoll());
+    LOGGER.info("executeOnce: Event retrieved. {}", event);
     // Record this event for retrying on connection failure or other exceptions
     setLastEvent(event);
     if (event instanceof EnrichedEvent && ((EnrichedEvent) event).isReleased()) {
+      LOGGER.info("executeOnce: Event is released, returning true.");
       lastEvent = null;
       return true;
     }
