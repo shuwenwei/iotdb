@@ -263,12 +263,14 @@ public class IoTDBDataRegionAsyncConnector extends IoTDBConnector {
 
   private void transferInEventWithoutCheck(final TabletInsertionEvent tabletInsertionEvent)
       throws Exception {
+    LOGGER.warn("transfer event transferInEventWithoutCheck {}", tabletInsertionEvent);
     if (tabletInsertionEvent instanceof PipeInsertNodeTabletInsertionEvent) {
       final PipeInsertNodeTabletInsertionEvent pipeInsertNodeTabletInsertionEvent =
           (PipeInsertNodeTabletInsertionEvent) tabletInsertionEvent;
       // We increase the reference count for this event to determine if the event may be released.
       if (!pipeInsertNodeTabletInsertionEvent.increaseReferenceCount(
           IoTDBDataRegionAsyncConnector.class.getName())) {
+        LOGGER.warn("transfer event increaseReferenceCount {}", tabletInsertionEvent);
         return;
       }
 
@@ -297,9 +299,11 @@ public class IoTDBDataRegionAsyncConnector extends IoTDBConnector {
       // We increase the reference count for this event to determine if the event may be released.
       if (!pipeRawTabletInsertionEvent.increaseReferenceCount(
           IoTDBDataRegionAsyncConnector.class.getName())) {
+        LOGGER.warn("transfer event increaseReferenceCount {}", tabletInsertionEvent);
         return;
       }
 
+      LOGGER.warn("transfer event create req {}", tabletInsertionEvent);
       final TPipeTransferReq pipeTransferTabletRawReq =
           compressIfNeeded(
               PipeTransferTabletRawReqV2.toTPipeTransferReq(
@@ -308,11 +312,13 @@ public class IoTDBDataRegionAsyncConnector extends IoTDBConnector {
                   pipeRawTabletInsertionEvent.isTableModelEvent()
                       ? pipeRawTabletInsertionEvent.getTableModelDatabaseName()
                       : null));
+      LOGGER.warn("transfer event create handler {}", tabletInsertionEvent);
       final PipeTransferTabletRawEventHandler pipeTransferTabletReqHandler =
           new PipeTransferTabletRawEventHandler(
               pipeRawTabletInsertionEvent, pipeTransferTabletRawReq, this);
-
+      LOGGER.warn("transfer event transfer {}", tabletInsertionEvent);
       transfer(pipeRawTabletInsertionEvent.getDeviceId(), pipeTransferTabletReqHandler);
+      LOGGER.warn("transfer end {}", tabletInsertionEvent);
     }
   }
 
@@ -346,11 +352,15 @@ public class IoTDBDataRegionAsyncConnector extends IoTDBConnector {
       final String deviceId, final PipeTransferTabletRawEventHandler pipeTransferTabletReqHandler) {
     AsyncPipeDataTransferServiceClient client = null;
     try {
+      LOGGER.warn("transfer event transfer deiceID{}", deviceId);
       client = clientManager.borrowClient(deviceId);
       pipeTransferTabletReqHandler.transfer(client);
+      LOGGER.warn("transfer event transfer deiceID end {}", deviceId);
     } catch (final Exception ex) {
+      LOGGER.warn("transfer event transfer deiceID end {} exception ", deviceId, ex);
       logOnClientException(client, ex);
       pipeTransferTabletReqHandler.onError(ex);
+      LOGGER.warn("transfer event transfer deiceID end {} exception end", deviceId, ex);
     }
   }
 

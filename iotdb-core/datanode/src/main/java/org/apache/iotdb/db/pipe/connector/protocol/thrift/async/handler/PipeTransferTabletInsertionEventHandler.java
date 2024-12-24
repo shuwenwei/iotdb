@@ -56,14 +56,17 @@ public abstract class PipeTransferTabletInsertionEventHandler<E extends TPipeTra
 
   public void transfer(final AsyncPipeDataTransferServiceClient client) throws TException {
     if (event instanceof EnrichedEvent) {
+      LOGGER.warn("transfer event transfer start limit  {} ", client);
       connector.rateLimitIfNeeded(
           ((EnrichedEvent) event).getPipeName(),
           ((EnrichedEvent) event).getCreationTime(),
           client.getEndPoint(),
           req.getBody().length);
+      LOGGER.warn("transfer event transfer end limit  {} ", client);
     }
-
+    LOGGER.warn("transfer event start doTransfer {}  ", client);
     doTransfer(client, req);
+    LOGGER.warn("transfer event end doTransfer {}  ", client);
   }
 
   protected abstract void doTransfer(
