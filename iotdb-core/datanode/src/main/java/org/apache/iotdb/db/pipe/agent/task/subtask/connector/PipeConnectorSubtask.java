@@ -141,6 +141,7 @@ public class PipeConnectorSubtask extends PipeAbstractConnectorSubtask {
       }
 
       decreaseReferenceCountAndReleaseLastEvent(event, true);
+      LOGGER.info("executeOnce: transfer success.{}", event);
     } catch (final PipeException e) {
       if (!isClosed.get()) {
         setLastExceptionEvent(event);
@@ -170,6 +171,7 @@ public class PipeConnectorSubtask extends PipeAbstractConnectorSubtask {
         clearReferenceCountAndReleaseLastEvent(event);
       }
     }
+    LOGGER.info("executeOnce: return {}", event);
 
     return true;
   }
