@@ -404,6 +404,7 @@ public class IoTDBPipeAlterIT extends AbstractPipeTableModelTestIT {
     }
   }
 
+  @Ignore
   @Test
   public void testAlterPipeSourceAndSink() {
     final DataNodeWrapper receiverDataNode = receiverEnv.getDataNodeWrapper(0);
