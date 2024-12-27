@@ -29,6 +29,7 @@ import org.apache.iotdb.db.pipe.consensus.deletion.DeletionResource;
 import org.apache.iotdb.db.pipe.consensus.deletion.DeletionResourceManager;
 import org.apache.iotdb.db.pipe.event.common.deletion.PipeDeleteDataNodeEvent;
 import org.apache.iotdb.db.pipe.event.common.heartbeat.PipeHeartbeatEvent;
+import org.apache.iotdb.db.pipe.event.common.tablet.PipeInsertNodeTabletInsertionEvent;
 import org.apache.iotdb.db.pipe.event.common.tsfile.PipeTsFileInsertionEvent;
 import org.apache.iotdb.db.pipe.event.realtime.PipeRealtimeEvent;
 import org.apache.iotdb.db.pipe.event.realtime.PipeRealtimeEventFactory;
@@ -37,12 +38,23 @@ import org.apache.iotdb.db.pipe.extractor.dataregion.realtime.matcher.CachedSche
 import org.apache.iotdb.db.pipe.extractor.dataregion.realtime.matcher.PipeDataRegionMatcher;
 import org.apache.iotdb.db.pipe.metric.PipeAssignerMetrics;
 import org.apache.iotdb.db.pipe.metric.PipeDataRegionEventCounter;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.InsertNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.InsertRowNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.RelationalInsertRowNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.RelationalInsertRowsNode;
+import org.apache.iotdb.db.queryengine.plan.planner.plan.node.write.RelationalInsertTabletNode;
 import org.apache.iotdb.pipe.api.event.dml.insertion.TsFileInsertionEvent;
 
+import org.apache.tsfile.file.metadata.IDeviceID;
+import org.apache.tsfile.file.metadata.TimeseriesMetadata;
+import org.apache.tsfile.read.TsFileSequenceReader;
+import org.apache.tsfile.read.TsFileSequenceReaderTimeseriesMetadataIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -179,6 +191,60 @@ public class PipeDataRegionAssigner implements Closeable {
                 tsFileInsertionEvent.disableMod4NonTransferPipes(
                     extractor.isShouldTransferModFile());
                 bindOrUpdateProgressIndexForTsFileInsertionEvent(tsFileInsertionEvent);
+              }
+
+              if (innerEvent instanceof PipeTsFileInsertionEvent
+                  && (((PipeTsFileInsertionEvent) innerEvent).isTableModelEvent())) {
+                try (final TsFileSequenceReader reader =
+                    new TsFileSequenceReader(
+                        (((PipeTsFileInsertionEvent) innerEvent).getTsFile()).getAbsolutePath())) {
+                  final TsFileSequenceReaderTimeseriesMetadataIterator timeseriesMetadataIterator =
+                      new TsFileSequenceReaderTimeseriesMetadataIterator(reader, true, 1);
+                  while (timeseriesMetadataIterator.hasNext()) {
+                    final Map<IDeviceID, List<TimeseriesMetadata>> device2TimeseriesMetadata =
+                        timeseriesMetadataIterator.next();
+
+                    for (IDeviceID deviceId : device2TimeseriesMetadata.keySet()) {
+                      LOGGER.warn(
+                          "{} assigner realtime load tsfile println device {}",
+                          extractor.getPipeName(),
+                          deviceId);
+                    }
+                  }
+                } catch (Exception e) {
+                  LOGGER.error(e.getMessage());
+                }
+              } else if (event.getEvent() instanceof PipeInsertNodeTabletInsertionEvent) {
+                try {
+                  PipeInsertNodeTabletInsertionEvent tabletInsertionEvent =
+                      (PipeInsertNodeTabletInsertionEvent) event.getEvent();
+                  final InsertNode insertNode = tabletInsertionEvent.getInsertNode();
+                  if (insertNode instanceof RelationalInsertTabletNode) {
+                    for (int i = 0;
+                        i < ((RelationalInsertTabletNode) insertNode).getRowCount();
+                        i++) {
+                      LOGGER.warn(
+                          "{} assigner realtime insertNode println device {}",
+                          extractor.getPipeName(),
+                          ((RelationalInsertTabletNode) insertNode).getDeviceID(i));
+                    }
+                  } else if (insertNode instanceof RelationalInsertRowsNode) {
+                    for (InsertRowNode rowNode :
+                        ((RelationalInsertRowsNode) insertNode).getInsertRowNodeList()) {
+                      LOGGER.warn(
+                          "{} assigner realtime  insertNode println device {}",
+                          extractor.getPipeName(),
+                          ((RelationalInsertRowNode) rowNode).getDeviceID());
+                    }
+                  } else if (insertNode instanceof RelationalInsertRowNode) {
+                    LOGGER.warn(
+                        "{} assigner realtime  insertNode println device {}",
+                        extractor.getPipeName(),
+                        ((RelationalInsertRowNode) insertNode).getDeviceID());
+                  }
+                } catch (Exception e) {
+                  LOGGER.error(e.getMessage());
+                }
               }
 
               if (innerEvent instanceof PipeDeleteDataNodeEvent) {
