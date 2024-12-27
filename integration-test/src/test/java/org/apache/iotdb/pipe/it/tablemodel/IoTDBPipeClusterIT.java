@@ -69,6 +69,7 @@ public class IoTDBPipeClusterIT extends AbstractPipeTableModelTestIT {
     senderEnv
         .getConfig()
         .getCommonConfig()
+        .setWalMode("sync")
         .setAutoCreateSchemaEnabled(true)
         .setEnableCrossSpaceCompaction(false)
         .setEnableSeqSpaceCompaction(false)
@@ -80,6 +81,7 @@ public class IoTDBPipeClusterIT extends AbstractPipeTableModelTestIT {
     receiverEnv
         .getConfig()
         .getCommonConfig()
+        .setWalMode("sync")
         .setAutoCreateSchemaEnabled(true)
         .setEnableCrossSpaceCompaction(false)
         .setEnableSeqSpaceCompaction(false)
