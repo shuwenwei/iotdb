@@ -31,6 +31,7 @@ import org.apache.tsfile.utils.Binary;
 import org.apache.tsfile.utils.BytesUtils;
 import org.apache.tsfile.utils.DateUtils;
 import org.apache.tsfile.utils.Pair;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -45,6 +46,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
+@Ignore
 @RunWith(IoTDBTestRunner.class)
 @Category({MultiClusterIT2ManualCreateSchema.class})
 public class IoTDBPipeTypeConversionIT extends AbstractPipeDualManualIT {

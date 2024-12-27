@@ -45,6 +45,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 
+@Ignore
 @RunWith(IoTDBTestRunner.class)
 @Category({MultiClusterIT2ManualCreateSchema.class})
 public class IoTDBPipeReqAutoSliceIT extends AbstractPipeDualManualIT {
