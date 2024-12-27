@@ -71,18 +71,30 @@ public abstract class PipeSubtask
   @Override
   public Boolean call() throws Exception {
     boolean hasAtLeastOneEventProcessed = false;
-
+    if (this instanceof PipeAbstractConnectorSubtask) {
+      LOGGER.info("call: start subtask {}", this);
+    }
     try {
+      if (this instanceof PipeAbstractConnectorSubtask) {
+        LOGGER.info("call: schedule {}", this);
+      }
       // If the scheduler allows to schedule, then try to consume an event
       while (subtaskScheduler.schedule()) {
         // If the event is consumed successfully, then continue to consume the next event
         // otherwise, stop consuming
+
         if (!executeOnce()) {
           break;
+        }
+        if (this instanceof PipeAbstractConnectorSubtask) {
+          LOGGER.info("call: consumed {}", this);
         }
         hasAtLeastOneEventProcessed = true;
       }
     } finally {
+      if (this instanceof PipeAbstractConnectorSubtask) {
+        LOGGER.info("call: reset {}", this);
+      }
       // Reset the scheduler to make sure that the scheduler can schedule again
       subtaskScheduler.reset();
     }
