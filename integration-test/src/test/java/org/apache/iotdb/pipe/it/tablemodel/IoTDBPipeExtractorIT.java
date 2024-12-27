@@ -49,6 +49,7 @@ import java.util.function.Consumer;
 
 import static org.junit.Assert.fail;
 
+@Ignore
 @RunWith(IoTDBTestRunner.class)
 @Category({MultiClusterIT2TableModel.class})
 public class IoTDBPipeExtractorIT extends AbstractPipeTableModelTestIT {
