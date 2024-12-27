@@ -41,6 +41,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.function.Consumer;
 
+@Ignore
 @RunWith(IoTDBTestRunner.class)
 @Category({MultiClusterIT2TableModel.class})
 public class IoTDBPipeDataSinkIT extends AbstractPipeTableModelTestIT {

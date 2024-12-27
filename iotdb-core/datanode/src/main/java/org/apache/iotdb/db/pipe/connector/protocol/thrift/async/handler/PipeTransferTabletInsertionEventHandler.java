@@ -21,48 +21,64 @@ package org.apache.iotdb.db.pipe.connector.protocol.thrift.async.handler;
 
 import org.apache.iotdb.common.rpc.thrift.TSStatus;
 import org.apache.iotdb.commons.client.async.AsyncPipeDataTransferServiceClient;
+import org.apache.iotdb.commons.pipe.event.EnrichedEvent;
 import org.apache.iotdb.db.pipe.connector.protocol.thrift.async.IoTDBDataRegionAsyncConnector;
-import org.apache.iotdb.db.pipe.event.common.PipeInsertionEvent;
+import org.apache.iotdb.pipe.api.event.dml.insertion.TabletInsertionEvent;
 import org.apache.iotdb.pipe.api.exception.PipeException;
 import org.apache.iotdb.rpc.TSStatusCode;
 import org.apache.iotdb.service.rpc.thrift.TPipeTransferReq;
 import org.apache.iotdb.service.rpc.thrift.TPipeTransferResp;
 
 import org.apache.thrift.TException;
+import org.apache.thrift.async.AsyncMethodCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public abstract class PipeTransferTabletInsertionEventHandler extends PipeTransferTrackableHandler {
+public abstract class PipeTransferTabletInsertionEventHandler<E extends TPipeTransferResp>
+    implements AsyncMethodCallback<E> {
 
   private static final Logger LOGGER =
       LoggerFactory.getLogger(PipeTransferTabletInsertionEventHandler.class);
 
-  protected final PipeInsertionEvent event;
+  protected final TabletInsertionEvent event;
   protected final TPipeTransferReq req;
 
+  protected final IoTDBDataRegionAsyncConnector connector;
+
   protected PipeTransferTabletInsertionEventHandler(
-      final PipeInsertionEvent event,
+      final TabletInsertionEvent event,
       final TPipeTransferReq req,
       final IoTDBDataRegionAsyncConnector connector) {
-    super(connector);
-
     this.event = event;
     this.req = req;
+    this.connector = connector;
   }
 
   public void transfer(final AsyncPipeDataTransferServiceClient client) throws TException {
-    connector.rateLimitIfNeeded(
-        event.getPipeName(), event.getCreationTime(), client.getEndPoint(), req.getBody().length);
-
-    tryTransfer(client, req);
+    if (event instanceof EnrichedEvent) {
+      LOGGER.warn("transfer event transfer start limit  {} ", client);
+      connector.rateLimitIfNeeded(
+          ((EnrichedEvent) event).getPipeName(),
+          ((EnrichedEvent) event).getCreationTime(),
+          client.getEndPoint(),
+          req.getBody().length);
+      LOGGER.warn("transfer event transfer end limit  {} ", client);
+    }
+    LOGGER.warn("transfer event start doTransfer {}  ", client);
+    doTransfer(client, req);
+    LOGGER.warn("transfer event end doTransfer {}  ", client);
   }
 
+  protected abstract void doTransfer(
+      final AsyncPipeDataTransferServiceClient client, final TPipeTransferReq req)
+      throws TException;
+
   @Override
-  protected boolean onCompleteInternal(final TPipeTransferResp response) {
+  public void onComplete(final TPipeTransferResp response) {
     // Just in case
     if (response == null) {
       onError(new PipeException("TPipeTransferResp is null"));
-      return false;
+      return;
     }
 
     final TSStatus status = response.getStatus();
@@ -74,36 +90,33 @@ public abstract class PipeTransferTabletInsertionEventHandler extends PipeTransf
             .statusHandler()
             .handle(response.getStatus(), response.getStatus().getMessage(), event.toString());
       }
-      event.decreaseReferenceCount(PipeTransferTabletInsertionEventHandler.class.getName(), true);
+      if (event instanceof EnrichedEvent) {
+        ((EnrichedEvent) event)
+            .decreaseReferenceCount(PipeTransferTabletInsertionEventHandler.class.getName(), true);
+      }
       if (status.isSetRedirectNode()) {
         updateLeaderCache(status);
       }
     } catch (final Exception e) {
       onError(e);
-      return false;
     }
-
-    return true;
   }
 
+  protected abstract void updateLeaderCache(final TSStatus status);
+
   @Override
-  protected void onErrorInternal(final Exception exception) {
+  public void onError(final Exception exception) {
     try {
       LOGGER.warn(
           "Failed to transfer TabletInsertionEvent {} (committer key={}, commit id={}).",
-          event.coreReportMessage(),
-          event.getCommitterKey(),
-          event.getCommitId(),
+          event instanceof EnrichedEvent
+              ? ((EnrichedEvent) event).coreReportMessage()
+              : event.toString(),
+          event instanceof EnrichedEvent ? ((EnrichedEvent) event).getCommitterKey() : null,
+          event instanceof EnrichedEvent ? ((EnrichedEvent) event).getCommitId() : null,
           exception);
     } finally {
       connector.addFailureEventToRetryQueue(event);
     }
   }
-
-  @Override
-  public void clearEventsReferenceCount() {
-    event.clearReferenceCount(PipeTransferTabletInsertionEventHandler.class.getName());
-  }
-
-  protected abstract void updateLeaderCache(final TSStatus status);
 }
