@@ -267,7 +267,7 @@ public class TsFileProcessor {
    */
   public void insert(InsertRowNode insertRowNode, long[] infoForMetrics)
       throws WriteProcessException {
-
+    logger.info("memTable insertRowNode device id: {}", insertRowNode.getDeviceID());
     ensureMemTable(infoForMetrics);
     long[] memIncrements;
 
@@ -348,6 +348,9 @@ public class TsFileProcessor {
   public void insertRows(InsertRowsNode insertRowsNode, long[] infoForMetrics)
       throws WriteProcessException {
 
+    for (InsertRowNode rowNode : insertRowsNode.getInsertRowNodeList()) {
+      logger.info("memTable inertRowNode device id: {}", rowNode.getDeviceID());
+    }
     ensureMemTable(infoForMetrics);
 
     long[] memIncrements;
@@ -540,6 +543,9 @@ public class TsFileProcessor {
       long[] infoForMetrics)
       throws WriteProcessException {
 
+    for (int i = 0; i < insertTabletNode.getRowCount(); i++) {
+      logger.info("memTable inertTabletNode device id: {}", insertTabletNode.getDeviceID(i));
+    }
     ensureMemTable(infoForMetrics);
 
     long[] memIncrements =
