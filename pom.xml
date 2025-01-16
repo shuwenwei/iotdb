@@ -70,7 +70,7 @@
         <ctest.skip.tests>false</ctest.skip.tests>
         <disruptor.version>3.4.4</disruptor.version>
         <drill.freemarker.maven.plugin.version>1.21.1</drill.freemarker.maven.plugin.version>
-        <dropwizard.metrics.version>4.2.19</dropwizard.metrics.version>
+        <dropwizard.metrics.version>4.2.29</dropwizard.metrics.version>
         <eclipse-collections.version>11.1.0</eclipse-collections.version>
         <!-- disable enforcer by default-->
         <enforcer.skip>true</enforcer.skip>
