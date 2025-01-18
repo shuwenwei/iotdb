@@ -48,7 +48,7 @@
         <!--airlift-stats.version>235</airlift-stats.version-->
         <airline.version>0.9</airline.version>
         <!-- This was the last version to support Java 8 -->
-        <antlr4.version>4.9.3</antlr4.version>
+        <antlr4.version>4.13.2</antlr4.version>
         <!-- By default, the argLine is empty-->
         <argLine/>
         <awaitility.version>4.2.0</awaitility.version>
