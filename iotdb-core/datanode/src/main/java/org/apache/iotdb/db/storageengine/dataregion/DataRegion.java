@@ -3041,6 +3041,8 @@ public class DataRegion implements IDataRegionForQuery {
     if (modFileToLoad.exists()) {
       // when successfully loaded, the filepath of the resource will be changed to the IoTDB data
       // dir, so we can add a suffix to find the old modification file.
+      FileMetrics.getInstance().increaseModFileNum(1);
+      FileMetrics.getInstance().increaseModFileSize(modFileToLoad.length());
       final File targetModFile =
           fsFactory.getFile(targetFile.getAbsolutePath() + ModificationFile.FILE_SUFFIX);
       try {
