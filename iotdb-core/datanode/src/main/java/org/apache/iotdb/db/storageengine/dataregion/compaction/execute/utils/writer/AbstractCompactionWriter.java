@@ -46,6 +46,7 @@ import org.apache.tsfile.write.schema.Schema;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public abstract class AbstractCompactionWriter implements AutoCloseable {
   protected int subTaskNum = IoTDBDescriptor.getInstance().getConfig().getSubCompactionTaskNum();
@@ -129,6 +130,7 @@ public abstract class AbstractCompactionWriter implements AutoCloseable {
   public abstract void checkAndMayFlushChunkMetadata() throws IOException;
 
   protected void writeDataPoint(long timestamp, TsPrimitiveType value, IChunkWriter chunkWriter) {
+    timestamp = TimeUnit.MILLISECONDS.toNanos(timestamp);
     if (chunkWriter instanceof ChunkWriterImpl) {
       ChunkWriterImpl chunkWriterImpl = (ChunkWriterImpl) chunkWriter;
       switch (chunkWriterImpl.getDataType()) {
