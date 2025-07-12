@@ -24,22 +24,130 @@ import org.apache.iotdb.db.storageengine.dataregion.compaction.execute.task.subt
 import org.apache.iotdb.db.storageengine.dataregion.compaction.schedule.CompactionTaskManager;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResource;
 import org.apache.iotdb.db.storageengine.dataregion.tsfile.TsFileResourceStatus;
+import org.apache.iotdb.db.storageengine.dataregion.tsfile.generator.TsFileNameGenerator;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TsFileRewriteTool {
+  private static final AtomicInteger version = new AtomicInteger(0);
+  private static final int MAX_THREADS = 4;
 
-  public static void main(String[] args) {
+  public TsFileRewriteTool() {}
+
+  private static final ThreadFactory compactionThreadFactory =
+      new ThreadFactory() {
+        private final AtomicInteger threadCount = new AtomicInteger(1);
+
+        @Override
+        public Thread newThread(Runnable r) {
+          int threadId = threadCount.getAndIncrement();
+          Thread thread = new Thread(r);
+          thread.setName("pool-1-IoTDB-Compaction-Worker-" + threadId);
+          return thread;
+        }
+      };
+  private static final ExecutorService executor =
+      Executors.newFixedThreadPool(MAX_THREADS, compactionThreadFactory);
+  private static final CompletionService<File> completionService =
+      new ExecutorCompletionService<>(executor);
+
+  public static void main(String[] args) throws InterruptedException {
     Thread.currentThread().setName("pool-1-IoTDB-Compaction-Worker-1");
     CompactionTaskManager.getInstance().start();
-    CompactionTaskManager.getInstance().setWriteMergeRate(1000);
+    CompactionTaskManager.getInstance().setWriteMergeRate(1000.0);
+
+    if (args.length < 2) {
+      System.err.println("Usage: TsFileRewriteTool <source_dir> <target_dir>");
+      System.exit(1);
+    }
+
+    String source_dir = args[0];
+    String target_dir = args[1];
+    File source = new File(source_dir);
+    File target = new File(target_dir);
+
+    if (!target.exists() && !target.mkdirs()) {
+      System.err.println("Failed to create target directory: " + target.getAbsolutePath());
+      System.exit(1);
+    }
+
+    List<File> tsFiles = collectTsFiles(source);
+    System.out.println("Found " + tsFiles.size() + " files to process");
+
+    AtomicInteger successCount = new AtomicInteger(0);
+    AtomicInteger failureCount = new AtomicInteger(0);
+
+    for (File tsFile : tsFiles) {
+      completionService.submit(
+          () -> {
+            try {
+              File result = compaction(tsFile, target);
+              System.out.println("Processed: " + tsFile.getName() + " -> " + result.getName());
+              successCount.incrementAndGet();
+              return result;
+            } catch (Exception e) {
+              System.err.println("Error processing " + tsFile.getAbsolutePath());
+              e.printStackTrace();
+              failureCount.incrementAndGet();
+              throw e;
+            }
+          });
+    }
+
+    for (int i = 0; i < tsFiles.size(); i++) {
+      try {
+        completionService.take().get();
+      } catch (ExecutionException e) {
+      }
+    }
+
+    System.out.println("\nProcessing completed!");
+    System.out.println("Success: " + successCount.get());
+    System.out.println("Failed: " + failureCount.get());
+
+    executor.shutdown();
     try {
-      compaction(
-          new File("/Users/shuww/Downloads/tsfile0627/1/108477033601-2-2-2.tsfile"),
-          new File("/Users/shuww/Downloads/tsfile0627/2"));
-    } catch (Exception e) {
-      e.printStackTrace();
+      if (!executor.awaitTermination(1, TimeUnit.MINUTES)) {
+        executor.shutdownNow();
+      }
+    } catch (InterruptedException e) {
+      executor.shutdownNow();
+      Thread.currentThread().interrupt();
+    }
+
+    CompactionTaskManager.getInstance().stop();
+  }
+
+  private static List<File> collectTsFiles(File sourceDir) {
+    List<File> tsFiles = new ArrayList<>();
+    collectTsFilesRecursive(sourceDir, tsFiles);
+    return tsFiles;
+  }
+
+  private static void collectTsFilesRecursive(File dir, List<File> result) {
+    File[] files = dir.listFiles();
+    if (files == null) return;
+
+    for (File file : files) {
+      if (file.isDirectory()) {
+        collectTsFilesRecursive(file, result);
+      } else if (file.isFile() && file.getName().endsWith(".tsfile")) {
+        File resFile = new File(file.getPath() + ".resource");
+        if (resFile.exists()) {
+          result.add(file);
+        }
+      }
     }
   }
 
@@ -48,7 +156,11 @@ public class TsFileRewriteTool {
     resource.deserialize();
     resource.setStatusForTest(TsFileResourceStatus.NORMAL);
 
-    TsFileResource target = new TsFileResource(new File(targetDir.getPath(), file.getName()));
+    String name =
+        TsFileNameGenerator.generateNewTsFileName(
+            System.currentTimeMillis(), version.getAndIncrement(), 0, 0);
+
+    TsFileResource target = new TsFileResource(new File(targetDir, name));
     ReadPointCompactionPerformer performer =
         new ReadPointCompactionPerformer(
             Collections.singletonList(resource),
