@@ -57,13 +57,12 @@ public class TsFileRewriteTool {
           return thread;
         }
       };
-  private static final ExecutorService executor =
-      Executors.newFixedThreadPool(MAX_THREADS, compactionThreadFactory);
-  private static final CompletionService<File> completionService =
-      new ExecutorCompletionService<>(executor);
 
   public static void main(String[] args) throws InterruptedException {
-    Thread.currentThread().setName("pool-1-IoTDB-Compaction-Worker-1");
+    ExecutorService executor =
+        Executors.newFixedThreadPool(
+            args.length >= 3 ? Integer.parseInt(args[0]) : MAX_THREADS, compactionThreadFactory);
+    CompletionService<File> completionService = new ExecutorCompletionService<>(executor);
     CompactionTaskManager.getInstance().start();
     CompactionTaskManager.getInstance().setWriteMergeRate(1000.0);
 
