@@ -94,7 +94,7 @@ public class IoTDBClusterAuthorityIT {
       if (!user.equals("root")) {
         authorizerReq =
             new TAuthorizerReq(
-                AuthorType.DROP_USER.ordinal(),
+                AuthorType.DROP_USER_V2.ordinal(),
                 user,
                 "",
                 "",

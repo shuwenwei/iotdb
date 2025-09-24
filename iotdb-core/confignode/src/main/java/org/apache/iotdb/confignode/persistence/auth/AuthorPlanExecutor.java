@@ -123,6 +123,7 @@ public class AuthorPlanExecutor implements IAuthorPlanExecutor {
     try {
       switch (authorType) {
         case UpdateUser:
+        case UpdateUserV2:
           authorizer.updateUserPassword(userName, newPassword);
           break;
         case CreateUser:
@@ -135,6 +136,7 @@ public class AuthorPlanExecutor implements IAuthorPlanExecutor {
           authorizer.createRole(roleName);
           break;
         case DropUser:
+        case DropUserV2:
           authorizer.deleteUser(userName);
           break;
         case DropRole:
@@ -232,12 +234,14 @@ public class AuthorPlanExecutor implements IAuthorPlanExecutor {
           authorizer.createRole(roleName);
           break;
         case RUpdateUser:
+        case RUpdateUserV2:
           authorizer.updateUserPassword(userName, authorPlan.getPassword());
           break;
         case RDropRole:
           authorizer.deleteRole(roleName);
           break;
         case RDropUser:
+        case RDropUserV2:
           authorizer.deleteUser(userName);
           break;
         case RGrantUserRole:
