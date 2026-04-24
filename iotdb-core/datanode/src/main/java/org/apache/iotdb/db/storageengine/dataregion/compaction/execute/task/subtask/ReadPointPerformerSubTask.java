@@ -57,6 +57,8 @@ public class ReadPointPerformerSubTask implements Callable<Void> {
   private final AbstractCompactionWriter compactionWriter;
   private final Map<String, MeasurementSchema> schemaMap;
   private final int taskId;
+  private final boolean ignoreReadErrors;
+  private final List<String> skippedData;
 
   public ReadPointPerformerSubTask(
       IDeviceID device,
@@ -65,7 +67,9 @@ public class ReadPointPerformerSubTask implements Callable<Void> {
       QueryDataSource queryDataSource,
       AbstractCompactionWriter compactionWriter,
       Map<String, MeasurementSchema> schemaMap,
-      int taskId) {
+      int taskId,
+      boolean ignoreReadErrors,
+      List<String> skippedData) {
     this.device = device;
     this.measurementList = measurementList;
     this.fragmentInstanceContext = fragmentInstanceContext;
@@ -73,6 +77,8 @@ public class ReadPointPerformerSubTask implements Callable<Void> {
     this.compactionWriter = compactionWriter;
     this.schemaMap = schemaMap;
     this.taskId = taskId;
+    this.ignoreReadErrors = ignoreReadErrors;
+    this.skippedData = skippedData;
   }
 
   @Override
@@ -90,17 +96,42 @@ public class ReadPointPerformerSubTask implements Callable<Void> {
               queryDataSource,
               false);
 
-      if (dataBlockReader.hasNextBatch()) {
-        compactionWriter.startMeasurement(
-            measurement,
-            new ChunkWriterImpl(
-                measurementSchemas.get(0),
-                true,
-                EncryptUtils.getEncryptParameter(compactionWriter.getEncryptParameter())),
-            taskId);
-        ReadPointCompactionPerformer.writeWithReader(
-            compactionWriter, dataBlockReader, device, taskId, false);
-        compactionWriter.endMeasurement(taskId);
+      try {
+        if (dataBlockReader.hasNextBatch()) {
+          compactionWriter.startMeasurement(
+              measurement,
+              new ChunkWriterImpl(
+                  measurementSchemas.get(0),
+                  true,
+                  EncryptUtils.getEncryptParameter(compactionWriter.getEncryptParameter())),
+              taskId);
+          ReadPointCompactionPerformer.writeWithReader(
+              compactionWriter,
+              dataBlockReader,
+              device,
+              taskId,
+              false,
+              ignoreReadErrors,
+              skippedData,
+              logger,
+              String.format("measurement %s of device %s", measurement, device));
+          compactionWriter.endMeasurement(taskId);
+        }
+      } catch (Exception | OutOfMemoryError e) {
+        if (!ignoreReadErrors) {
+          throw e;
+        }
+        String message =
+            "Skip unreadable measurement "
+                + measurement
+                + " of device "
+                + device
+                + " Cause: "
+                + e.getClass().getSimpleName()
+                + ": "
+                + e.getMessage();
+        skippedData.add(message);
+        logger.error(message, e);
       }
     }
     return null;

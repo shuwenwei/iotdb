@@ -19,7 +19,6 @@
 package org.apache.iotdb.db.storageengine.dataregion.compaction.execute.performer.impl;
 
 import org.apache.iotdb.commons.conf.IoTDBConstant;
-import org.apache.iotdb.commons.exception.MetadataException;
 import org.apache.iotdb.commons.path.AlignedFullPath;
 import org.apache.iotdb.commons.path.IFullPath;
 import org.apache.iotdb.commons.path.NonAlignedFullPath;
@@ -88,6 +87,8 @@ public class ReadPointCompactionPerformer
   protected List<TsFileResource> targetFiles = Collections.emptyList();
 
   private EncryptParameter encryptParameter;
+  private boolean ignoreReadErrors = false;
+  private final List<String> skippedData = Collections.synchronizedList(new ArrayList<>());
 
   @TestOnly
   public ReadPointCompactionPerformer(
@@ -168,12 +169,16 @@ public class ReadPointCompactionPerformer
         boolean isAligned = deviceInfo.right;
         queryDataSource.fillOrderIndexes(device, true);
 
-        if (isAligned) {
-          compactAlignedSeries(
-              device, deviceIterator, compactionWriter, fragmentInstanceContext, queryDataSource);
-        } else {
-          compactNonAlignedSeries(
-              device, deviceIterator, compactionWriter, fragmentInstanceContext, queryDataSource);
+        try {
+          if (isAligned) {
+            compactAlignedSeries(
+                device, deviceIterator, compactionWriter, fragmentInstanceContext, queryDataSource);
+          } else {
+            compactNonAlignedSeries(
+                device, deviceIterator, compactionWriter, fragmentInstanceContext, queryDataSource);
+          }
+        } catch (Exception | OutOfMemoryError e) {
+          handleReadFailure(String.format("device %s", device), e);
         }
         summary.setTemporaryFileSize(compactionWriter.getWriterSize());
       }
@@ -204,13 +209,21 @@ public class ReadPointCompactionPerformer
     return encryptParameter;
   }
 
+  public void setIgnoreReadErrors(boolean ignoreReadErrors) {
+    this.ignoreReadErrors = ignoreReadErrors;
+  }
+
+  public List<String> getSkippedData() {
+    return new ArrayList<>(skippedData);
+  }
+
   private void compactAlignedSeries(
       IDeviceID device,
       MultiTsFileDeviceIterator deviceIterator,
       AbstractCompactionWriter compactionWriter,
       FragmentInstanceContext fragmentInstanceContext,
       QueryDataSource queryDataSource)
-      throws IOException, MetadataException {
+      throws Exception {
     Map<String, MeasurementSchema> schemaMap = deviceIterator.getAllSchemasOfCurrentDevice();
     IMeasurementSchema timeSchema = schemaMap.remove(TsFileConstant.TIME_COLUMN_ID);
     List<IMeasurementSchema> measurementSchemas = new ArrayList<>(schemaMap.values());
@@ -233,22 +246,58 @@ public class ReadPointCompactionPerformer
             queryDataSource,
             true);
 
-    if (dataBlockReader.hasNextBatch()) {
-      // chunkgroup is serialized only when at least one timeseries under this device has data
-      compactionWriter.startChunkGroup(device, true);
-      measurementSchemas.add(0, timeSchema);
-      compactionWriter.startMeasurement(
-          TsFileConstant.TIME_COLUMN_ID,
-          new AlignedChunkWriterImpl(
-              measurementSchemas.remove(0),
-              measurementSchemas,
-              EncryptUtils.getEncryptParameter(getEncryptParameter())),
-          0);
-      writeWithReader(compactionWriter, dataBlockReader, device, 0, true);
-      compactionWriter.endMeasurement(0);
-      compactionWriter.endChunkGroup();
-      // check whether to flush chunk metadata or not
-      compactionWriter.checkAndMayFlushChunkMetadata();
+    boolean hasStartedChunkGroup = false;
+    boolean hasStartedMeasurement = false;
+    try {
+      if (dataBlockReader.hasNextBatch()) {
+        // chunkgroup is serialized only when at least one timeseries under this device has data
+        compactionWriter.startChunkGroup(device, true);
+        hasStartedChunkGroup = true;
+        measurementSchemas.add(0, timeSchema);
+        compactionWriter.startMeasurement(
+            TsFileConstant.TIME_COLUMN_ID,
+            new AlignedChunkWriterImpl(
+                measurementSchemas.remove(0),
+                measurementSchemas,
+                EncryptUtils.getEncryptParameter(getEncryptParameter())),
+            0);
+        hasStartedMeasurement = true;
+        writeWithReader(
+            compactionWriter,
+            dataBlockReader,
+            device,
+            0,
+            true,
+            ignoreReadErrors,
+            skippedData,
+            logger,
+            String.format("aligned device %s", device));
+        compactionWriter.endMeasurement(0);
+        hasStartedMeasurement = false;
+        compactionWriter.endChunkGroup();
+        hasStartedChunkGroup = false;
+        // check whether to flush chunk metadata or not
+        compactionWriter.checkAndMayFlushChunkMetadata();
+      }
+    } catch (Exception | OutOfMemoryError e) {
+      if (!ignoreReadErrors) {
+        throw e;
+      }
+      if (hasStartedMeasurement) {
+        try {
+          compactionWriter.endMeasurement(0);
+        } catch (Exception expected) {
+          logger.warn("Failed to close aligned measurement for device {}", device, expected);
+        }
+      }
+      if (hasStartedChunkGroup) {
+        try {
+          compactionWriter.endChunkGroup();
+        } catch (Exception expected) {
+          logger.warn("Failed to close aligned chunk group for device {}", device, expected);
+        }
+      }
+      recordSkippedData(skippedData, logger, String.format("aligned device %s", device), e);
     }
   }
 
@@ -288,7 +337,9 @@ public class ReadPointCompactionPerformer
                         new QueryDataSource(queryDataSource),
                         compactionWriter,
                         schemaMap,
-                        i)));
+                        i,
+                        ignoreReadErrors,
+                        skippedData)));
       }
       for (Future<Void> future : futures) {
         future.get();
@@ -345,6 +396,62 @@ public class ReadPointCompactionPerformer
     }
   }
 
+  public static void writeWithReader(
+      AbstractCompactionWriter writer,
+      IDataBlockReader reader,
+      IDeviceID device,
+      int subTaskId,
+      boolean isAligned,
+      boolean ignoreReadErrors,
+      List<String> skippedData,
+      Logger logger,
+      String seriesIdentifier)
+      throws Exception {
+    while (true) {
+      boolean hasNextBatch;
+      try {
+        hasNextBatch = reader.hasNextBatch();
+      } catch (Exception | OutOfMemoryError e) {
+        if (!ignoreReadErrors) {
+          throw e;
+        }
+        recordSkippedData(skippedData, logger, "remainder of " + seriesIdentifier, e);
+        return;
+      }
+      if (!hasNextBatch) {
+        return;
+      }
+
+      TsBlock tsBlock;
+      try {
+        tsBlock = reader.nextBatch();
+      } catch (Exception | OutOfMemoryError e) {
+        if (!ignoreReadErrors) {
+          throw e;
+        }
+        recordSkippedData(skippedData, logger, "remainder of " + seriesIdentifier, e);
+        return;
+      }
+
+      try {
+        if (isAligned) {
+          writer.write(tsBlock, subTaskId);
+        } else {
+          IPointReader pointReader = tsBlock.getTsBlockSingleColumnIterator();
+          while (pointReader.hasNextTimeValuePair()) {
+            writer.write(pointReader.nextTimeValuePair(), subTaskId);
+          }
+        }
+      } catch (Exception | OutOfMemoryError e) {
+        if (!ignoreReadErrors) {
+          throw e;
+        }
+        recordSkippedData(skippedData, logger, "remainder of " + seriesIdentifier, e);
+        return;
+      }
+    }
+  }
+
   protected AbstractCompactionWriter getCompactionWriter(
       List<TsFileResource> seqFileResources,
       List<TsFileResource> unseqFileResources,
@@ -382,5 +489,28 @@ public class ReadPointCompactionPerformer
   @Override
   public Optional<AbstractInnerSpaceEstimator> getInnerSpaceEstimator() {
     return Optional.of(new RepairUnsortedFileCompactionEstimator());
+  }
+
+  private void handleReadFailure(String seriesIdentifier, Throwable e) throws Exception {
+    if (!ignoreReadErrors) {
+      if (e instanceof Exception) {
+        throw (Exception) e;
+      }
+      throw (OutOfMemoryError) e;
+    }
+    recordSkippedData(skippedData, logger, seriesIdentifier, e);
+  }
+
+  private static void recordSkippedData(
+      List<String> skippedData, Logger logger, String seriesIdentifier, Throwable e) {
+    String message =
+        "Skip unreadable "
+            + seriesIdentifier
+            + " Cause: "
+            + e.getClass().getSimpleName()
+            + ": "
+            + e.getMessage();
+    skippedData.add(message);
+    logger.error(message, e);
   }
 }
